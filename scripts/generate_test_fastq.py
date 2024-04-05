@@ -11,11 +11,18 @@ def read_barcodes(file: str) -> List[str]:
     with open(file, 'r') as f:
         return [line.strip() for line in f]
 
-def mutate(sequence: str, num_mutations: int, mutation_char: str) -> str:
+def mutate(sequence: str, num_mutations: int) -> str:
     sequence_list = list(sequence)
+    mutated_pos: List[int] = []
     for _ in range(num_mutations):
         pos = random.randint(0, len(sequence_list) - 1)
-        sequence_list[pos] = mutation_char
+        if pos in mutated_pos:
+            continue
+        mutated_pos.append(pos)
+        ch = sequence_list[pos]
+        poss = {"A", "C", "G" , "T"}
+        poss.remove(ch)
+        sequence_list[pos] = random.choice(list(poss))
     return ''.join(sequence_list)
 
 def generate_polya(num_mutations: int) -> str:
@@ -28,7 +35,7 @@ def get_mutations(mutation_map: Dict[str, str], file: str, num_mutations: int) -
     return mutation_map[file] * num_mutations
 
 def generate_read_r1(bc1: str, bc2: str, bc3: str) -> str:
-    read = 'GTCA' + bc1 + 'AACC' + bc2 + 'ACAG' + bc3 + 'CCTA' + 'TTCGAG' + generate_umi() + generate_polya(0)
+    read = bc1 + 'AACC' + bc2 + 'ACAG' + bc3 + 'CCTA' + 'TTCGAG' + generate_umi() + generate_polya(0)
     return (read + 'A' * MAXLEN)[:MAXLEN]
 
 def generate_read_r2(num_mutations_bc1: int, num_mutations_bc2: int, num_mutations_bc3: int) -> str:
@@ -40,9 +47,13 @@ def generate_quality() -> str:
 
 
 def mut() -> int:
-    return random.choices([0, 1, 2, 3], weights=[70, 10, 10, 10], k=1)[0]
+    #return random.choices([0, 1, 2, 3], weights=[70, 10, 10, 10], k=1)[0]
+    #return 0
+    return 1
+    #return 2
 
-bc1s = read_barcodes('bc1.txt')
+#bc1s = read_barcodes('bc1.txt')
+bc1s = read_barcodes('bc1_no_fixed.txt')
 bc2s = read_barcodes('bc2.txt')
 bc3s = read_barcodes('bc3.txt')
 
@@ -55,9 +66,9 @@ with gzip.open('R1.fastq.gz', 'wt') as r1, gzip.open('R2.fastq.gz', 'wt') as r2:
         num_mutations_bc1 = mut()
         num_mutations_bc2 = mut()
         num_mutations_bc3 = mut()
-        bc1 = mutate(bc1s[random.randint(0, len(bc1s) - 1)], num_mutations_bc1, mutation_map['bc1.txt'])
-        bc2 = mutate(bc2s[random.randint(0, len(bc2s) - 1)], num_mutations_bc2, mutation_map['bc2.txt'])
-        bc3 = mutate(bc3s[random.randint(0, len(bc3s) - 1)], num_mutations_bc3, mutation_map['bc3.txt'])
+        bc1 = mutate(bc1s[random.randint(0, len(bc1s) - 1)], num_mutations_bc1)
+        bc2 = mutate(bc2s[random.randint(0, len(bc2s) - 1)], num_mutations_bc2)
+        bc3 = mutate(bc3s[random.randint(0, len(bc3s) - 1)], num_mutations_bc3)
         read_r1 = generate_read_r1(bc1, bc2, bc3)
         read_r2 = generate_read_r2(num_mutations_bc1, num_mutations_bc2, num_mutations_bc3)
         quality = generate_quality()

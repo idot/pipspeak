@@ -51,6 +51,8 @@ impl Barcodes {
 
         for (idx, line) in reader.lines().enumerate() {
             let barcode = line.map(|l| Self::read_sequence(&l, spacer))?;
+            //println!("Line number: {}, length: {}, Barcode: {:?}", idx + 1, barcode.len(), barcode);
+
             sizes.insert(barcode.len());
             map.entry(barcode.clone()).or_insert(idx);
             index.entry(idx).or_insert(barcode);

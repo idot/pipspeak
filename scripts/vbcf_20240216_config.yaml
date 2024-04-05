@@ -1,0 +1,9 @@
+barcodes:
+  bc1: "bc1_custom_primer.txt"
+  bc2: "bc2.txt"
+  bc3: "bc3.txt"
+  bc4: "bc4.txt"
+spacers:
+  s1: "AACC"
+  s2: "ACAG"
+  s3: "CCTA"
