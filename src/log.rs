@@ -7,6 +7,8 @@ use anyhow::Result;
 use hashbrown::HashSet;
 use serde::Serialize;
 
+use crate::config::Config;
+
 #[derive(Debug, Default, Serialize, Clone)]
 pub struct Statistics {
     pub total_reads: usize,
@@ -20,10 +22,15 @@ pub struct Statistics {
     pub num_filtered_umi: usize,
     #[serde(skip)]
     pub whitelist: HashSet<Vec<u8>>,
+    #[serde(skip)]
+    pub counter_maps: CounterMaps,
 }
 impl Statistics {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            counter_maps: CounterMaps::new(),
+            ..Self::default()
+        }
     }
     pub fn calculate_metrics(&mut self) {
         self.fraction_passing = self.passing_reads as f64 / self.total_reads as f64;
@@ -34,6 +41,20 @@ impl Statistics {
         for seq in &self.whitelist {
             writer.write(seq)?;
             writer.write(b"\n")?;
+        }
+        Ok(())
+    }
+    pub fn counter_maps_to_file(&self, file: &str, config: &Config) -> Result<()> {
+        let mut writer = File::create(file).map(BufWriter::new)?;
+        let _ = writer.write(b"position\tbarcode\tcount\n");
+        for (position, map) in self.counter_maps.maps.iter().enumerate() {
+            let map = map.lock().unwrap();
+            for (k, v) in map.iter() {
+                let bc = config.get_barcode(*k, position)
+                    .and_then(|bc| String::from_utf8(bc.to_vec()).ok())
+                    .unwrap_or_else(|| "unknown".to_string());
+                writer.write_all(format!("{}\t{}\t{}\n", position, bc, v).as_bytes())?;
+            }
         }
         Ok(())
     }
@@ -82,5 +103,43 @@ impl Log {
         let yaml = serde_yaml::to_string(&self)?;
         std::fs::write(path, yaml)?;
         Ok(())
+    }
+}
+
+
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+#[derive(Debug, Default, Serialize)]
+pub struct CounterMaps {
+    maps: Vec<Mutex<HashMap<usize, usize>>>,
+}
+
+impl Clone for CounterMaps {
+    fn clone(&self) -> Self {
+        let maps = self.maps.iter().map(|m| {
+            let map = m.lock().unwrap();
+            Mutex::new(map.clone())
+        }).collect();
+        Self { maps }
+    }
+}
+
+impl CounterMaps {
+    // Initialize the counter maps
+    pub fn new() -> Self {
+        let maps = vec![
+            Mutex::new(HashMap::new()),
+            Mutex::new(HashMap::new()),
+            Mutex::new(HashMap::new()),
+            Mutex::new(HashMap::new()),
+        ];
+        Self { maps }
+    }
+
+    /// Add to the respective map
+    pub fn add(&self, index: usize, position: usize) {
+        let mut map = self.maps[position].lock().unwrap();
+        *map.entry(index).or_insert(0) += 1;
     }
 }

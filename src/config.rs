@@ -137,6 +137,17 @@ impl Config {
         self.umi_len
     }
 
+    /// Returns the barcode based on index
+    pub fn get_barcode(&self, b_index: usize, position: usize) -> Option<&[u8]> {
+        match position {
+            0 => Some(&self.bc1),
+            1 => Some(&self.bc2),
+            2 => Some(&self.bc3),
+            3 => Some(&self.bc4),
+            _ => None,
+        }.and_then(|bc| bc.get_barcode(b_index, self.linkers))
+    }
+
 }
 
 #[cfg(test)]
