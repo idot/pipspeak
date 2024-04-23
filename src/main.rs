@@ -165,6 +165,8 @@ fn main() -> Result<()> {
     let timestamp = Local::now().to_string();
     let start_time = Instant::now();
 
+    let umi_len = if config.umi_len() == 0 { args.umi_len }else{ config.umi_len() };
+
     let statistics = parse_records(
         r1,
         r2,
@@ -172,7 +174,7 @@ fn main() -> Result<()> {
         &mut r2_writer,
         &config,
         args.offset,
-        args.umi_len,
+        umi_len,
     )?;
     statistics.whitelist_to_file(&whitelist_filename)?;
 

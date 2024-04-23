@@ -27,7 +27,7 @@ pub struct Cli {
     #[clap(short = 'c', long, value_parser)]
     pub config: String,
 
-    /// The length of the UMI
+    /// The length of the UMI, overriden in the config file if present
     #[clap(short = 'u', long, default_value = "12")]
     pub umi_len: usize,
 

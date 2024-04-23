@@ -13,12 +13,10 @@ def read_barcodes(file: str) -> List[str]:
 
 def mutate(sequence: str, num_mutations: int) -> str:
     sequence_list = list(sequence)
-    mutated_pos: List[int] = []
-    for _ in range(num_mutations):
-        pos = random.randint(0, len(sequence_list) - 1)
-        if pos in mutated_pos:
-            continue
-        mutated_pos.append(pos)
+    positions = list(range(len(sequence)))
+    random.shuffle(positions)
+    mut_pos = positions[:num_mutations]
+    for pos in mut_pos:
         ch = sequence_list[pos]
         poss = {"A", "C", "G" , "T"}
         poss.remove(ch)
@@ -51,6 +49,7 @@ def mut() -> int:
     #return 0
     return 1
     #return 2
+    #return 8
 
 #bc1s = read_barcodes('bc1.txt')
 bc1s = read_barcodes('bc1_no_fixed.txt')
@@ -60,17 +59,22 @@ bc3s = read_barcodes('bc3.txt')
 mutation_map = {'bc1.txt': 'C', 'bc2.txt': 'G', 'bc3.txt': 'T'}
 
 
+def generate_fastq_files():
+    with gzip.open('R1.fastq.gz', 'wt') as r1, gzip.open('R2.fastq.gz', 'wt') as r2:
+        for i in range(MAXSEQ):
+            num_mutations_bc1 = mut()
+            num_mutations_bc2 = mut()
+            num_mutations_bc3 = mut()
+            bc1 = mutate(bc1s[random.randint(0, len(bc1s) - 1)], num_mutations_bc1)
+            bc2 = mutate(bc2s[random.randint(0, len(bc2s) - 1)], num_mutations_bc2)
+            bc3 = mutate(bc3s[random.randint(0, len(bc3s) - 1)], num_mutations_bc3)
+            read_r1 = generate_read_r1(bc1, bc2, bc3)
+            read_r2 = generate_read_r2(num_mutations_bc1, num_mutations_bc2, num_mutations_bc3)
+            quality = generate_quality()
+            r1.write(f'@SEQ_ID_{i}\n{read_r1}\n+\n{quality}\n')
+            r2.write(f'@SEQ_ID_{i}\n{read_r2}\n+\n{quality}\n')
 
-with gzip.open('R1.fastq.gz', 'wt') as r1, gzip.open('R2.fastq.gz', 'wt') as r2:
-    for i in range(MAXSEQ):
-        num_mutations_bc1 = mut()
-        num_mutations_bc2 = mut()
-        num_mutations_bc3 = mut()
-        bc1 = mutate(bc1s[random.randint(0, len(bc1s) - 1)], num_mutations_bc1)
-        bc2 = mutate(bc2s[random.randint(0, len(bc2s) - 1)], num_mutations_bc2)
-        bc3 = mutate(bc3s[random.randint(0, len(bc3s) - 1)], num_mutations_bc3)
-        read_r1 = generate_read_r1(bc1, bc2, bc3)
-        read_r2 = generate_read_r2(num_mutations_bc1, num_mutations_bc2, num_mutations_bc3)
-        quality = generate_quality()
-        r1.write(f'@SEQ_ID_{i}\n{read_r1}\n+\n{quality}\n')
-        r2.write(f'@SEQ_ID_{i}\n{read_r2}\n+\n{quality}\n')
+if __name__ == "__main__":
+    generate_fastq_files()
+
+

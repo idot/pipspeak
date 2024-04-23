@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct ConfigYaml {
     barcodes: ConfigBarcodes,
     spacers: ConfigSpacers,
+    parameters: Option<ConfigParameters>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -23,12 +24,18 @@ pub struct ConfigSpacers {
     s3: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ConfigParameters {
+    umi_len: usize,
+}
+
 pub struct Config {
     bc1: Barcodes,
     bc2: Barcodes,
     bc3: Barcodes,
     bc4: Barcodes,
     linkers: bool,
+    umi_len: usize,
 }
 impl Config {
     pub fn from_file(path: &str, exact: bool, linkers: bool) -> Result<Self> {
@@ -45,12 +52,19 @@ impl Config {
         let bc2 = Self::load_barcode(&yaml.barcodes.bc2, Some(&spacer2), exact)?;
         let bc3 = Self::load_barcode(&yaml.barcodes.bc3, Some(&spacer3), exact)?;
         let bc4 = Self::load_barcode(&yaml.barcodes.bc4, None, exact)?;
+
+        let umi_len = match yaml.parameters {
+            Some(parameters) => parameters.umi_len,
+            None => 0,
+        };
+
         Ok(Self {
             bc1,
             bc2,
             bc3,
             bc4,
             linkers,
+            umi_len,
         })
     }
 
@@ -117,6 +131,12 @@ impl Config {
         );
         bc
     }
+
+    /// Returns the length of the UMI
+    pub fn umi_len(&self) -> usize {
+        self.umi_len
+    }
+
 }
 
 #[cfg(test)]
@@ -130,6 +150,13 @@ mod testing {
     fn load_yaml() {
         let config = Config::from_file(TEST_PATH, false, false);
         assert!(config.is_ok());
+    }
+
+    #[test]
+    fn load_yaml_umi_len() {
+        let config = Config::from_file("data/config_v3_umi_len.yaml", false, false);
+        assert!(config.is_ok());
+        assert!(config.unwrap().umi_len == 8)
     }
 
     #[test]
@@ -269,4 +296,6 @@ mod testing {
         .concat();
         assert_eq!(bc, exp);
     }
+
+
 }
