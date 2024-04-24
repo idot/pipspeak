@@ -22,3 +22,4 @@ indicatif = "0.17.5"
 num_cpus = "1.15.0"
 serde = { version = "1.0.164", features = ["derive"] }
 serde_yaml = "0.9.21"
+psutil = "3.2.1"

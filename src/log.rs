@@ -24,11 +24,14 @@ pub struct Statistics {
     pub whitelist: HashSet<Vec<u8>>,
     #[serde(skip)]
     pub counter_maps: BarcodePartCounterMaps,
+    #[serde(skip)]
+    pub barcode_umi_counter: BarcodeUmiCounter,
 }
 impl Statistics {
     pub fn new() -> Self {
         Self {
             counter_maps: BarcodePartCounterMaps::new(),
+            barcode_umi_counter: BarcodeUmiCounter::new(),
             ..Self::default()
         }
     }
@@ -43,6 +46,9 @@ impl Statistics {
             writer.write(b"\n")?;
         }
         Ok(())
+    }
+    pub fn barcode_umi_stats_to_file(&self, file: &str) -> std::io::Result<()> {
+        self.barcode_umi_counter.write_barcode_stats(file)
     }
     pub fn counter_maps_to_file(&self, file: &str, config: &Config) -> Result<()> {
         let mut writer = File::create(file).map(BufWriter::new)?;
@@ -142,4 +148,120 @@ impl BarcodePartCounterMaps {
         let mut map = self.maps[position].lock().unwrap();
         *map.entry(index).or_insert(0) += 1;
     }
+}
+
+
+#[derive(Debug, Default, Serialize)]
+pub struct UmiCounter {
+    map: Mutex<HashMap<u32, u32>>,
+}
+
+impl Clone for UmiCounter {
+    fn clone(&self) -> Self {
+        let map = self.map.lock().unwrap().clone();
+        Self {
+            map: Mutex::new(map),
+        }
+    }
+}
+
+impl UmiCounter {
+    pub fn new() -> Self {
+        Self {
+            map: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn umi2u32(umi: &Vec<u8>) -> u32 {
+        if umi.len() > 16 {
+            panic!("UMI length is greater than 16")
+        }
+        let mut res = 0;
+        for &b in umi {
+            res <<= 2;
+            match b {
+                b'A' => res |= 0,
+                b'C' => res |= 1,
+                b'G' => res |= 2,
+                b'T' => res |= 3,
+                _ => panic!("Invalid UMI base"),
+            }
+        }
+        res
+    }
+
+    pub fn add(&self, umi: &Vec<u8>) {
+        let umi_e = Self::umi2u32(umi);
+        let mut map = self.map.lock().unwrap();
+        *map.entry(umi_e).or_insert(0) += 1;
+    }
+}
+
+
+#[derive(Debug, Default, Serialize)]
+pub struct BarcodeUmiCounter {
+    map: Mutex<HashMap<u32, UmiCounter>>,
+}
+
+impl Clone for BarcodeUmiCounter {
+    fn clone(&self) -> Self {
+        let map = self.map.lock().unwrap().clone();
+        Self {
+            map: Mutex::new(map)
+        }
+    }
+}
+
+impl BarcodeUmiCounter {
+    pub fn new() -> Self {
+        Self {
+            map: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn barcodes2u32(
+        b1_idx: usize,
+        b2_idx: usize,
+        b3_idx: usize,
+        b4_idx: usize,) -> u32 {
+        
+        let b1 = b1_idx as u8;
+        let b2 = b2_idx as u8;
+        let b3 = b3_idx as u8;
+        let b4 = b4_idx as u8;
+
+        ((b1 as u32) << 24) | ((b2 as u32) << 16) | ((b3 as u32) << 8) | (b4 as u32)
+    }
+
+    pub fn add(&self, 
+        b1_idx: usize,
+        b2_idx: usize,
+        b3_idx: usize,
+        b4_idx: usize,
+        umi: &Vec<u8>) {
+        let barcode_e = Self::barcodes2u32(b1_idx, b2_idx, b3_idx, b4_idx);
+        let mut map = self.map.lock().unwrap();
+        map.entry(barcode_e).or_insert_with(UmiCounter::new).add(umi);
+    }
+
+    pub fn write_barcode_stats(&self, filename: &str) -> std::io::Result<()> {
+        let mut file = File::create(filename)?;
+
+        writeln!(file, "barcode,total_umi,unique_umi,median_umi")?;
+
+        for (barcode, umi_counter) in self.map.lock().unwrap().iter() {
+            let umi_counts: Vec<u32> = umi_counter.map.lock().unwrap().values().cloned().collect();
+            let total_umis = umi_counts.iter().sum::<u32>();
+            let unique_umis = umi_counts.len() as u32;
+
+            let mut sorted_counts = umi_counts;
+            sorted_counts.sort_unstable();
+            let median_umi = sorted_counts[sorted_counts.len() / 2];
+
+            writeln!(file, "{},{},{},{}", barcode, total_umis, unique_umis, median_umi)?;
+        }
+
+        Ok(())
+    }
+
 }

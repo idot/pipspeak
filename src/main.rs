@@ -20,6 +20,7 @@ use std::{
     io::Write,
     time::{Duration, Instant},
 };
+use psutil::process::Process;
 
 /// Writes a record to a gzip fastq file
 fn write_to_fastq<W: Write>(writer: &mut W, id: &[u8], seq: &[u8], qual: &[u8]) -> Result<()> {
@@ -50,8 +51,13 @@ fn parse_records(
         .inspect(|_| statistics.total_reads += 1)
         .enumerate()
         .map(|(idx, pair)| {
-            if idx % 125 == 0 {
-                pb.set_message(format!("Processed {} reads", idx));
+            if idx % 1000000 == 0 || (idx < 1000 && idx % 100 == 0) {
+                let process = Process::current().unwrap();
+                let mem_info = process.memory_info().unwrap();
+                let used_mem = mem_info.rss();
+                let msg = format!("Processed {} reads, used memory: {} KB", idx, used_mem);
+                print!("{}", msg);
+                pb.set_message(msg);
             }
             pair
         })
@@ -112,6 +118,7 @@ fn parse_records(
             statistics.counter_maps.add(b2_idx, 1);
             statistics.counter_maps.add(b3_idx, 2);
             statistics.counter_maps.add(b4_idx, 3);
+            statistics.barcode_umi_counter.add(b1_idx, b2_idx, b3_idx, b4_idx, &umi);
             construct_seq.extend_from_slice(&umi);
             let construct_qual = rec1.qual().unwrap()[pos - construct_seq.len()..pos].to_vec();
             (construct_seq, construct_qual, rec1, rec2)
@@ -158,6 +165,7 @@ fn main() -> Result<()> {
     let log_filename = args.prefix.clone() + "_log.yaml";
     let whitelist_filename = args.prefix.clone() + "_whitelist.txt";
     let countermaps_filename = args.prefix.clone() + "_barcode_position_counts.tsv";
+    let barcodes_umi_filename = args.prefix.clone() + "_barcode_umi_stats.tsv";
 
     let (r1_threads, r2_threads) = set_threads(args.threads);
     let mut r1_writer: ParCompress<Gzip> = ParCompressBuilder::new()
@@ -183,6 +191,7 @@ fn main() -> Result<()> {
     )?;
     statistics.whitelist_to_file(&whitelist_filename)?;
     statistics.counter_maps_to_file(&countermaps_filename, &config)?;
+    statistics.barcode_umi_stats_to_file(&barcodes_umi_filename)?;
 
     let elapsed_time = start_time.elapsed().as_secs_f64();
     let timing = Timing {
