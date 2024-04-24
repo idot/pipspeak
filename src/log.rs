@@ -23,12 +23,12 @@ pub struct Statistics {
     #[serde(skip)]
     pub whitelist: HashSet<Vec<u8>>,
     #[serde(skip)]
-    pub counter_maps: CounterMaps,
+    pub counter_maps: BarcodePartCounterMaps,
 }
 impl Statistics {
     pub fn new() -> Self {
         Self {
-            counter_maps: CounterMaps::new(),
+            counter_maps: BarcodePartCounterMaps::new(),
             ..Self::default()
         }
     }
@@ -111,11 +111,11 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 #[derive(Debug, Default, Serialize)]
-pub struct CounterMaps {
+pub struct BarcodePartCounterMaps {
     maps: Vec<Mutex<HashMap<usize, usize>>>,
 }
 
-impl Clone for CounterMaps {
+impl Clone for BarcodePartCounterMaps {
     fn clone(&self) -> Self {
         let maps = self.maps.iter().map(|m| {
             let map = m.lock().unwrap();
@@ -125,7 +125,7 @@ impl Clone for CounterMaps {
     }
 }
 
-impl CounterMaps {
+impl BarcodePartCounterMaps {
     // Initialize the counter maps
     pub fn new() -> Self {
         let maps = vec![
