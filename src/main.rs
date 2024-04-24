@@ -100,16 +100,22 @@ fn parse_records(
                 None
             } else {
                 let umi = &rec1.seq()[pos..pos + umi_len];
-                Some((
-                    b1_idx,
-                    b2_idx,
-                    b3_idx,
-                    b4_idx,
-                    umi.to_vec(),
-                    pos + umi_len,
-                    rec1,
-                    rec2,
-                ))
+                let contains_n = umi.iter().any(|&base| base == b'N');
+                if contains_n {
+                    statistics.num_filtered_umi += 1;
+                    None
+                } else {
+                    Some((
+                        b1_idx,
+                        b2_idx,
+                        b3_idx,
+                        b4_idx,
+                        umi.to_vec(),
+                        pos + umi_len,
+                        rec1,
+                        rec2,
+                    ))
+                }
             }
         })
         .map(|(b1_idx, b2_idx, b3_idx, b4_idx, umi, pos, rec1, rec2)| {
