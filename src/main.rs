@@ -56,7 +56,7 @@ fn parse_records(
                 let mem_info = process.memory_info().unwrap();
                 let used_mem = mem_info.rss();
                 let used_gb = used_mem as f64 / 1024.0 / 1024.0 / 1024.0;
-                let msg = format!("Processed {} reads, used memory: {}b, {}Gb\n", idx, used_mem, used_gb);
+                let msg = format!("Processed {} reads, used memory: {:.2}Gb\n", idx, used_gb);
                 print!("{}", msg);
                 pb.set_message(msg);
             }
