@@ -254,7 +254,7 @@ impl BarcodeUmiCounter {
 
     pub fn write_barcode_stats(&self, filename: &str) -> std::io::Result<()> {
         let mut writer = File::create(filename).map(BufWriter::new)?;
-        writer.write(b"barcode,total_umi,unique_umi,median_umi\n")?;
+        writer.write(b"barcode,total_umi,unique_umi,mean_umi,median_umi,q25,q75\n")?;
         for (barcode, umi_counter) in self.map.lock().unwrap().iter() {
             let umi_counts: Vec<u32> = umi_counter.map.lock().unwrap().values().cloned().collect();
             let total_umis = umi_counts.iter().sum::<u32>();
@@ -262,9 +262,14 @@ impl BarcodeUmiCounter {
 
             let mut sorted_counts = umi_counts;
             sorted_counts.sort_unstable();
+            
+            let mean_umi = total_umis as f64 / unique_umis as f64;
             let median_umi = sorted_counts[sorted_counts.len() / 2];
-
-            writeln!(writer, "{},{},{},{}", barcode, total_umis, unique_umis, median_umi)?;
+            let q25 = sorted_counts[(sorted_counts.len() / 4) as usize];
+            let q75 = sorted_counts[(sorted_counts.len() * 3 / 4) as usize];
+    
+            writeln!(writer, "{},{},{},{},{:.1},{},{}", barcode, total_umis, unique_umis,  mean_umi, median_umi, q25, q75)?;
+    
         }
         Ok(())
     }
