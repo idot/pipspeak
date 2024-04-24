@@ -119,6 +119,7 @@ fn parse_records(
             statistics.counter_maps.add(b3_idx, 2);
             statistics.counter_maps.add(b4_idx, 3);
             statistics.barcode_umi_counter.add(b1_idx, b2_idx, b3_idx, b4_idx, &umi);
+            statistics.umi_base_composition.add(&umi);
             construct_seq.extend_from_slice(&umi);
             let construct_qual = rec1.qual().unwrap()[pos - construct_seq.len()..pos].to_vec();
             (construct_seq, construct_qual, rec1, rec2)
@@ -166,6 +167,7 @@ fn main() -> Result<()> {
     let whitelist_filename = args.prefix.clone() + "_whitelist.txt";
     let countermaps_filename = args.prefix.clone() + "_barcode_position_counts.tsv";
     let barcodes_umi_filename = args.prefix.clone() + "_barcode_umi_stats.tsv";
+    let umi_stats_filename = args.prefix.clone() + "_umi_composition_stats.tsv";
 
     let (r1_threads, r2_threads) = set_threads(args.threads);
     let mut r1_writer: ParCompress<Gzip> = ParCompressBuilder::new()
@@ -192,6 +194,7 @@ fn main() -> Result<()> {
     statistics.whitelist_to_file(&whitelist_filename)?;
     statistics.counter_maps_to_file(&countermaps_filename, &config)?;
     statistics.barcode_umi_stats_to_file(&barcodes_umi_filename)?;
+    statistics.umi_base_composition.write_umi_base_composition(&umi_stats_filename)?;
 
     let elapsed_time = start_time.elapsed().as_secs_f64();
     let timing = Timing {

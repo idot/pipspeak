@@ -26,12 +26,15 @@ pub struct Statistics {
     pub counter_maps: BarcodePartCounterMaps,
     #[serde(skip)]
     pub barcode_umi_counter: BarcodeUmiCounter,
+    #[serde(skip)]
+    pub umi_base_composition: UMIBaseComposition,
 }
 impl Statistics {
     pub fn new() -> Self {
         Self {
             counter_maps: BarcodePartCounterMaps::new(),
             barcode_umi_counter: BarcodeUmiCounter::new(),
+            umi_base_composition: UMIBaseComposition::new(16),
             ..Self::default()
         }
     }
@@ -150,7 +153,9 @@ impl BarcodePartCounterMaps {
     }
 }
 
-
+/// A struct to hold the UMI counts
+/// encodes the UMI as a u32
+/// and the count as a u32
 #[derive(Debug, Default, Serialize)]
 pub struct UmiCounter {
     map: Mutex<HashMap<u32, u32>>,
@@ -197,7 +202,9 @@ impl UmiCounter {
     }
 }
 
-
+/// Holds the barcode and UMI counts
+/// encodes the barcode as a u32
+/// and the UMI as a u32
 #[derive(Debug, Default, Serialize)]
 pub struct BarcodeUmiCounter {
     map: Mutex<HashMap<u32, UmiCounter>>,
@@ -211,6 +218,7 @@ impl Clone for BarcodeUmiCounter {
         }
     }
 }
+
 
 impl BarcodeUmiCounter {
     pub fn new() -> Self {
@@ -245,10 +253,8 @@ impl BarcodeUmiCounter {
     }
 
     pub fn write_barcode_stats(&self, filename: &str) -> std::io::Result<()> {
-        let mut file = File::create(filename)?;
-
-        writeln!(file, "barcode,total_umi,unique_umi,median_umi")?;
-
+        let mut writer = File::create(filename).map(BufWriter::new)?;
+        writer.write(b"barcode,total_umi,unique_umi,median_umi\n")?;
         for (barcode, umi_counter) in self.map.lock().unwrap().iter() {
             let umi_counts: Vec<u32> = umi_counter.map.lock().unwrap().values().cloned().collect();
             let total_umis = umi_counts.iter().sum::<u32>();
@@ -258,10 +264,77 @@ impl BarcodeUmiCounter {
             sorted_counts.sort_unstable();
             let median_umi = sorted_counts[sorted_counts.len() / 2];
 
-            writeln!(file, "{},{},{},{}", barcode, total_umis, unique_umis, median_umi)?;
+            writeln!(writer, "{},{},{},{}", barcode, total_umis, unique_umis, median_umi)?;
+        }
+        Ok(())
+    }
+
+}
+
+/// Holds the base composition
+/// counts for each base
+#[derive(Debug, Default, Serialize, Clone)]
+pub struct BaseComposition {
+    pub a: u64,
+    pub c: u64,
+    pub g: u64,
+    pub t: u64,
+    pub n: u64,
+}
+
+impl BaseComposition {
+    pub fn empty(&self) -> bool {
+        self.a == 0 && self.c == 0 && self.g == 0 && self.t == 0 && self.n == 0
+    }
+}
+
+impl BaseComposition {
+    pub fn add_base(&mut self, base: u8) {
+        match base {
+            b'A' => self.a += 1,
+            b'C' => self.c += 1,
+            b'G' => self.g += 1,
+            b'T' => self.t += 1,
+            b'N' => self.n += 1,
+            _ => panic!("Invalid base"),
+        }
+    }
+}
+
+/// Holds the UMI base composition
+/// for each position in the UMI
+/// 
+#[derive(Debug, Default, Serialize, Clone)]
+pub struct UMIBaseComposition {
+    pub bases: Vec<BaseComposition>,
+}
+
+impl UMIBaseComposition {
+    pub fn new(umi_len: usize) -> Self {
+        let mut bases = Vec::with_capacity(umi_len);
+        for _ in 0..umi_len {
+            bases.push(BaseComposition::default());
+        }
+        Self { bases }
+    }
+
+    pub fn add(&mut self, umi: &Vec<u8>) {
+        for (i, &base) in umi.iter().enumerate() {
+            self.bases[i].add_base(base);
+        }
+    }
+
+    pub fn write_umi_base_composition(&self, filename: &str) -> std::io::Result<()> {
+        let mut writer = File::create(filename).map(BufWriter::new)?;
+        writer.write(b"position,a,c,g,t,n\n")?;
+
+        for (i, base) in self.bases.iter().enumerate() {
+            if ! base.empty() {
+                writeln!( writer, "{},{},{},{},{},{}", i, base.a, base.c, base.g, base.t, base.n)?;
+            }
         }
 
         Ok(())
     }
-
+    
 }
