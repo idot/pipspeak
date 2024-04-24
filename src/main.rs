@@ -55,7 +55,7 @@ fn parse_records(
                 let process = Process::current().unwrap();
                 let mem_info = process.memory_info().unwrap();
                 let used_mem = mem_info.rss();
-                let msg = format!("Processed {} reads, used memory: {} KB", idx, used_mem);
+                let msg = format!("Processed {} reads, used memory: {} KB\n", idx, used_mem);
                 print!("{}", msg);
                 pb.set_message(msg);
             }
