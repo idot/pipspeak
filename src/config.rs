@@ -4,25 +4,11 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigYaml {
-    barcodes: ConfigBarcodes,
-    spacers: ConfigSpacers,
+    barcodes: Vec<String>,
+    spacers: Vec<String>,
     parameters: Option<ConfigParameters>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ConfigBarcodes {
-    bc1: String,
-    bc2: String,
-    bc3: String,
-    bc4: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ConfigSpacers {
-    s1: String,
-    s2: String,
-    s3: String,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigParameters {
@@ -30,10 +16,7 @@ pub struct ConfigParameters {
 }
 
 pub struct Config {
-    bc1: Barcodes,
-    bc2: Barcodes,
-    bc3: Barcodes,
-    bc4: Barcodes,
+    barcodes: Vec<Barcodes>,
     linkers: bool,
     umi_len: usize,
 }
@@ -45,29 +28,42 @@ impl Config {
     }
 
     pub fn from_yaml(yaml: ConfigYaml, exact: bool, linkers: bool) -> Result<Self> {
-        let spacer1 = Spacer::from_str(&yaml.spacers.s1);
-        let spacer2 = Spacer::from_str(&yaml.spacers.s2);
-        let spacer3 = Spacer::from_str(&yaml.spacers.s3);
-        let bc1 = Self::load_barcode(&yaml.barcodes.bc1, Some(&spacer1), exact)?;
-        let bc2 = Self::load_barcode(&yaml.barcodes.bc2, Some(&spacer2), exact)?;
-        let bc3 = Self::load_barcode(&yaml.barcodes.bc3, Some(&spacer3), exact)?;
-        let bc4 = Self::load_barcode(&yaml.barcodes.bc4, None, exact)?;
+        let mut barcodes = Vec::new();
+        for (idx, (barcode_path, spacer)) in yaml.barcodes.iter().zip(yaml.spacers.iter()).enumerate() {
+            let barcode = if idx < yaml.spacers.len() {
+                Self::load_barcode(barcode_path, Some(spacer), exact)?
+            } else {
+                Self::load_barcode(barcode_path, None, exact)?
+            };
+            barcodes.push(barcode);
+        }
 
-        let umi_len = match yaml.parameters {
-            Some(parameters) => parameters.umi_len,
-            None => 0,
-        };
+        let umi_len = yaml.parameters.map(|p| p.umi_len).unwrap_or(0);
 
         Ok(Self {
-            bc1,
-            bc2,
-            bc3,
-            bc4,
+            barcodes,
             linkers,
             umi_len,
         })
     }
 
+    pub fn build_barcode(&self, indices: &[usize]) -> Vec<u8> {
+        let mut bc = Vec::new();
+        for (idx, &barcode_idx) in indices.iter().enumerate() {
+            bc.extend_from_slice(
+                self.barcodes[idx]
+                    .get_barcode(barcode_idx, self.linkers)
+                    .expect(&format!("Invalid barcode index in bc{}", idx + 1)),
+            );
+        }
+        bc
+    }
+
+    pub fn barcode_count(&self) -> usize {
+        self.barcodes.len()
+    }
+
+   
     fn load_barcode(path: &str, spacer: Option<&Spacer>, exact: bool) -> Result<Barcodes> {
         if let Some(spacer) = spacer {
             Barcodes::from_file_with_spacer(path, spacer, exact)

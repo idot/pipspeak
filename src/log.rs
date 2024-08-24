@@ -15,10 +15,7 @@ pub struct Statistics {
     pub passing_reads: usize,
     pub fraction_passing: f64,
     pub whitelist_size: usize,
-    pub num_filtered_1: usize,
-    pub num_filtered_2: usize,
-    pub num_filtered_3: usize,
-    pub num_filtered_4: usize,
+    pub num_filtered: Vec<usize>,
     pub num_filtered_umi: usize,
     #[serde(skip)]
     pub whitelist: HashSet<Vec<u8>>,
@@ -32,9 +29,10 @@ pub struct Statistics {
 impl Statistics {
     pub fn new() -> Self {
         Self {
-            counter_maps: BarcodePartCounterMaps::new(),
+            counter_maps: BarcodePartCounterMaps::new(barcode_count),
             barcode_umi_counter: BarcodeUmiCounter::new(),
             umi_base_composition: UMIBaseComposition::new(16),
+            num_filtered: vec![0; barcode_count],
             ..Self::default()
         }
     }
@@ -67,6 +65,15 @@ impl Statistics {
         }
         Ok(())
     }
+}
+
+
+pub struct BarcodePartCounterMaps {
+    maps: Vec<Mutex<HashMap<usize, usize>>>,
+}
+
+impl BarcodePartCounterMaps {
+
 }
 
 #[derive(Debug, Serialize)]
@@ -136,14 +143,9 @@ impl Clone for BarcodePartCounterMaps {
 
 impl BarcodePartCounterMaps {
     // Initialize the counter maps
-    pub fn new() -> Self {
-        let maps = vec![
-            Mutex::new(HashMap::new()),
-            Mutex::new(HashMap::new()),
-            Mutex::new(HashMap::new()),
-            Mutex::new(HashMap::new()),
-        ];
-        Self { maps }
+    pub fn new(barcode_count: usize) -> Self {
+       let maps = (0..barcode_count).map(|_| Mutex::new(HashMap::new())).collect();
+       Self { maps }
     }
 
     /// Add to the respective map
@@ -152,6 +154,9 @@ impl BarcodePartCounterMaps {
         *map.entry(index).or_insert(0) += 1;
     }
 }
+
+
+
 
 /// A struct to hold the UMI counts
 /// encodes the UMI as a u32
@@ -202,12 +207,16 @@ impl UmiCounter {
     }
 }
 
+
+
+
+
 /// Holds the barcode and UMI counts
 /// encodes the barcode as a u32
 /// and the UMI as a u32
 #[derive(Debug, Default, Serialize)]
 pub struct BarcodeUmiCounter {
-    map: Mutex<HashMap<u32, UmiCounter>>,
+    map: Mutex<HashMap<Vec<usize>, UmiCounter>>,
 }
 
 impl Clone for BarcodeUmiCounter {
@@ -241,22 +250,16 @@ impl BarcodeUmiCounter {
         ((b1 as u32) << 24) | ((b2 as u32) << 16) | ((b3 as u32) << 8) | (b4 as u32)
     }
 
-    pub fn add(&self, 
-        b1_idx: usize,
-        b2_idx: usize,
-        b3_idx: usize,
-        b4_idx: usize,
-        umi: &Vec<u8>) {
-        let barcode_e = Self::barcodes2u32(b1_idx, b2_idx, b3_idx, b4_idx);
+    pub fn add(&self, barcode_indices: &[usize], umi: &Vec<u8>) {
         let mut map = self.map.lock().unwrap();
-        map.entry(barcode_e).or_insert_with(UmiCounter::new).add(umi);
+        map.entry(barcode_indices.to_vec()).or_insert_with(UmiCounter::new).add(umi);
     }
 
     pub fn write_barcode_stats(&self, filename: &str) -> std::io::Result<()> {
         let mut writer = File::create(filename).map(BufWriter::new)?;
         writer.write(b"barcode,total_umi,unique_umi,mean_umi,median_umi,q25,q75\n")?;
         for (barcode, umi_counter) in self.map.lock().unwrap().iter() {
-            let umi_counts: Vec<u32> = umi_counter.map.lock().unwrap().values().cloned().collect();
+            let barcode_str = barcode.iter().map(|&idx| idx.to_string()).collect::<Vec<_>>().join("_");
             let total_umis = umi_counts.iter().sum::<u32>();
             let unique_umis = umi_counts.len() as u32;
 

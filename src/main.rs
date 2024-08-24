@@ -43,9 +43,10 @@ fn parse_records(
     offset: usize,
     umi_len: usize,
 ) -> Result<Statistics> {
-    let mut statistics = Statistics::new();
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(Duration::from_millis(100));
+    let mut statistics = Statistics::new(config.barcode_count());
+
     let record_iter = r1
         .zip(r2)
         .inspect(|_| statistics.total_reads += 1)
@@ -63,39 +64,23 @@ fn parse_records(
             pair
         })
         .filter_map(|(rec1, rec2)| {
-            if let Some((pos, b1_idx)) = config.match_subsequence(rec1.seq(), 0, 0, Some(offset)) {
-                Some((rec1, rec2, pos, b1_idx))
-            } else {
-                statistics.num_filtered_1 += 1;
-                None
+            let mut pos = 0;
+            let mut barcode_indices = Vec::new();
+            
+            for i in 0..config.barcode_count() {
+                if let Some((new_pos, bc_idx)) = config.match_subsequence(&rec1.seq(), i, pos, if i == 0 { Some(offset) } else { None }) {
+                    pos = new_pos;
+                    barcode_indices.push(bc_idx);
+                } else {
+                    statistics.num_filtered[i] += 1;
+                    return None;
+                }
             }
+            
+            statistics.passing_reads += 1;
+            Some((rec1, rec2, pos, barcode_indices))
         })
-        .filter_map(|(rec1, rec2, pos, b1_idx)| {
-            if let Some((new_pos, b2_idx)) = config.match_subsequence(rec1.seq(), 1, pos, None) {
-                Some((rec1, rec2, pos + new_pos, b1_idx, b2_idx))
-            } else {
-                statistics.num_filtered_2 += 1;
-                None
-            }
-        })
-        .filter_map(|(rec1, rec2, pos, b1_idx, b2_idx)| {
-            if let Some((new_pos, b3_idx)) = config.match_subsequence(&rec1.seq(), 2, pos, None) {
-                Some((rec1, rec2, pos + new_pos, b1_idx, b2_idx, b3_idx))
-            } else {
-                statistics.num_filtered_3 += 1;
-                None
-            }
-        })
-        .filter_map(|(rec1, rec2, pos, b1_idx, b2_idx, b3_idx)| {
-            if let Some((new_pos, b4_idx)) = config.match_subsequence(&rec1.seq(), 3, pos, None) {
-                statistics.passing_reads += 1;
-                Some((rec1, rec2, pos + new_pos, b1_idx, b2_idx, b3_idx, b4_idx))
-            } else {
-                statistics.num_filtered_4 += 1;
-                None
-            }
-        })
-        .filter_map(|(rec1, rec2, pos, b1_idx, b2_idx, b3_idx, b4_idx)| {
+        .filter_map(|(rec1, rec2, pos, barcode_indices)| {
             if rec1.seq().len() < pos + umi_len {
                 statistics.num_filtered_umi += 1;
                 None
@@ -106,31 +91,22 @@ fn parse_records(
                     statistics.num_filtered_umi += 1;
                     None
                 } else {
-                    Some((
-                        b1_idx,
-                        b2_idx,
-                        b3_idx,
-                        b4_idx,
-                        umi.to_vec(),
-                        pos + umi_len,
-                        rec1,
-                        rec2,
-                    ))
+                    Some((barcode_indices, umi.to_vec(), pos + umi_len, rec1, rec2))
                 }
             }
         })
-        .map(|(b1_idx, b2_idx, b3_idx, b4_idx, umi, pos, rec1, rec2)| {
-            let mut construct_seq = config.build_barcode(b1_idx, b2_idx, b3_idx, b4_idx);
-            statistics.counter_maps.add(b1_idx, 0);
-            statistics.counter_maps.add(b2_idx, 1);
-            statistics.counter_maps.add(b3_idx, 2);
-            statistics.counter_maps.add(b4_idx, 3);
-            statistics.barcode_umi_counter.add(b1_idx, b2_idx, b3_idx, b4_idx, &umi);
+        .map(|(barcode_indices, umi, pos, rec1, rec2)| {
+            let mut construct_seq = config.build_barcode(&barcode_indices);
+            for (i, &idx) in barcode_indices.iter().enumerate() {
+                statistics.counter_maps.add(idx, i);
+            }
+            statistics.barcode_umi_counter.add(&barcode_indices, &umi);
             statistics.umi_base_composition.add(&umi);
             construct_seq.extend_from_slice(&umi);
             let construct_qual = rec1.qual().unwrap()[pos - construct_seq.len()..pos].to_vec();
             (construct_seq, construct_qual, rec1, rec2)
         });
+    
 
     for (c_seq, c_qual, rec1, rec2) in record_iter {
         statistics.whitelist.insert(c_seq.clone());
