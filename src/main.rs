@@ -13,6 +13,7 @@ use gzp::{
     deflate::Gzip,
     par::compress::{ParCompress, ParCompressBuilder},
 };
+use indexmap::map::MutableEntryKey;
 use indicatif::ProgressBar;
 use log::{FileIO, Log, Parameters, Statistics, Timing};
 use std::{
@@ -21,6 +22,9 @@ use std::{
     time::{Duration, Instant},
 };
 use psutil::process::Process;
+use std::rc::Rc;
+use std::cell::RefCell;
+
 
 /// Writes a record to a gzip fastq file
 fn write_to_fastq<W: Write>(writer: &mut W, id: &[u8], seq: &[u8], qual: &[u8]) -> Result<()> {
@@ -33,6 +37,56 @@ fn write_to_fastq<W: Write>(writer: &mut W, id: &[u8], seq: &[u8], qual: &[u8]) 
     writer.write_all(b"\n")?;
     Ok(())
 }
+
+fn match_records<'a>(rec1: &'a Record, rec2: &'a Record, offset: usize, config: &Config,  statistics: &mut Statistics) -> Option<(&'a Record, &'a Record, usize, Vec<usize> )> {
+    let mut pos = 0;
+    let mut barcode_indices = Vec::new();
+    
+    for i in 0..config.barcode_count() {
+        if let Some((new_pos, bc_idx)) = config.match_subsequence(&rec1.seq(), i, pos, if i == 0 { Some(offset) } else { None }) {
+            pos = new_pos;
+            barcode_indices.push(bc_idx);
+        } else {
+            statistics.num_filtered[i] += 1;
+            return None;
+        }
+    }
+    
+    statistics.passing_reads += 1;
+    Some((rec1, rec2, pos, barcode_indices))
+}
+
+
+
+fn match_umi<'a>(rec1: &'a Record, rec2: &'a Record, pos: usize, barcode_indices: Vec<usize>, umi_len: usize, statistics: &mut Statistics) -> Option<(&'a Record, &'a Record, usize, Vec<usize>, Vec<u8>)> {
+    if rec1.seq().len() < pos + umi_len {
+        statistics.num_filtered_umi += 1;
+        None
+    } else {
+        let umi = rec1.seq()[pos..pos + umi_len].to_vec();
+        let contains_n = umi.iter().any(|&base| base == b'N');
+        if contains_n {
+            statistics.num_filtered_umi += 1;
+            None
+        } else {
+            Some((rec1, rec2, pos + umi_len, barcode_indices, umi))
+        }
+    }
+}
+
+fn construct_match<'a>(rec1: &'a Record, rec2: &'a Record, pos: usize, barcode_indices: &[usize], umi: &Vec<u8>, config: &Config, statistics: &mut Statistics) -> (Vec<u8>, Vec<u8>, &'a Record, &'a Record) {
+    let mut construct_seq = config.build_barcode(barcode_indices);
+    for (i, &idx) in barcode_indices.iter().enumerate() {
+        statistics.counter_maps.add(idx, i);
+    }
+    statistics.barcode_umi_counter.add(barcode_indices, umi);
+    statistics.umi_base_composition.add(umi);
+    construct_seq.extend_from_slice(umi);
+    
+    let construct_qual = rec1.qual().unwrap()[pos - construct_seq.len()..pos].to_vec();
+    (construct_seq, construct_qual, rec1, rec2)
+}
+
 
 fn parse_records(
     r1: Box<dyn FastxRead<Item = Record>>,
@@ -64,51 +118,13 @@ fn parse_records(
             pair
         })
         .filter_map(|(rec1, rec2)| {
-            let mut pos = 0;
-            let mut barcode_indices = Vec::new();
-            
-            for i in 0..config.barcode_count() {
-                if let Some((new_pos, bc_idx)) = config.match_subsequence(&rec1.seq(), i, pos, if i == 0 { Some(offset) } else { None }) {
-                    pos = new_pos;
-                    barcode_indices.push(bc_idx);
-                } else {
-                    statistics.num_filtered[i] += 1;
-                    return None;
-                }
-            }
-            
-            statistics.passing_reads += 1;
-            Some((rec1, rec2, pos, barcode_indices))
+            match_records(&rec1, &rec2, offset, config, &mut statistics)
         })
         .filter_map(|(rec1, rec2, pos, barcode_indices)| {
-            if rec1.seq().len() < pos + umi_len {
-                statistics.num_filtered_umi += 1;
-                None
-            } else {
-                let umi = &rec1.seq()[pos..pos + umi_len];
-                let contains_n = umi.iter().any(|&base| base == b'N');
-                if contains_n {
-                    statistics.num_filtered_umi += 1;
-                    None
-                } else {
-                    Some((barcode_indices, umi.to_vec(), pos + umi_len, rec1, rec2))
-                }
-            }
+            match_umi(rec1, rec2, pos, barcode_indices, umi_len, &mut statistics)
         })
-        .map(|(barcode_indices, umi, pos, rec1, rec2)| {
-            let mut construct_seq = config.build_barcode(&barcode_indices);
-            for (i, &idx) in barcode_indices.iter().enumerate() {
-                statistics.counter_maps.add(idx, i);
-            }
-            statistics.barcode_umi_counter.add(&barcode_indices, &umi);
-            statistics.umi_base_composition.add(&umi);
-            construct_seq.extend_from_slice(&umi);
-            println!("{:?}", construct_seq);
-            println!("{:?}", rec1.seq());
-            println!("{:?}", rec1.qual());
-            println!("{:?} {}", pos, construct_seq.len());
-            let construct_qual = rec1.qual().unwrap()[pos - construct_seq.len()..pos].to_vec();
-            (construct_seq, construct_qual, rec1, rec2)
+        .map(|(rec1, rec2, pos, barcode_indices, umi)| {
+            construct_match(rec1, rec2, pos, &barcode_indices, &umi, config, &mut statistics)
         });
     
 

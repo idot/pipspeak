@@ -122,3 +122,34 @@ spacers:
   s2: "GAG"
   s3: "TCGAG"
 ```
+```
+target/debug/pipspeak  -c data/config_v3.yaml   -i data/example_v3/example_R1.fq.gz  -I data/example_v3/example_R1.fq.gz
+
+  Processed 250 reads, 198 passed filters (79.2000%)                                                                                                  
+  parameters:
+  offset: 5
+  umi_len: 12
+  exact_matching: false
+  write_linkers: false
+  pipspeak_version: 0.1.9
+file_io:
+  readpath_r1: data/example_v3/example_R1.fq.gz
+  readpath_r2: data/example_v3/example_R1.fq.gz
+  writepath_r1: pipspeak_R1.fq.gz
+  writepath_r2: pipspeak_R2.fq.gz
+  whitelist_path: pipspeak_whitelist.txt
+statistics:
+  total_reads: 250
+  passing_reads: 198
+  fraction_passing: 0.792
+  whitelist_size: 198
+  num_filtered_1: 41
+  num_filtered_2: 6
+  num_filtered_3: 3
+  num_filtered_4: 2
+  num_filtered_umi: 0
+timing:
+  timestamp: 2024-08-25 17:40:11.885440 +02:00
+  elapsed_time: 0.007741375
+
+```
