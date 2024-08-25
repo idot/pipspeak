@@ -1,7 +1,7 @@
 barcodes:
   bc1: "pip-seq_v2_bc1.tsv"
-  bc2: "pip-seq_v2_bc2.tsv"
+  bc2: "pip-seq_v2_bc2b.tsv"
   bc3: "pip-seq_v2_bc3.tsv"
 spacers:
-  s1: "ATGCAT"
-  s2: "CTCGAG"
+  s1: "ATGCATC,ATGCATG"
+  s2: "GCTCGAG,CCTCGAG"

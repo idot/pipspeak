@@ -21,41 +21,55 @@ impl Barcodes {
         let reader = File::open(path).map(BufReader::new)?;
         Self::from_buffer(reader, exact)
     }
-    pub fn from_file_with_spacer(path: &str, spacer: &Spacer, exact: bool) -> Result<Self> {
+    pub fn from_file_with_spacer(path: &str, spacers: &Vec<Spacer>, exact: bool) -> Result<Self> {
         let reader = File::open(path).map(BufReader::new)?;
-        Self::from_buffer_with_spacer(reader, spacer, exact)
+        Self::from_buffer_with_spacer(reader, spacers, exact)
     }
 
     pub fn from_buffer<R: BufRead>(reader: R, exact: bool) -> Result<Self> {
-        Self::parse_buffer(reader, None, exact)
+        Self::parse_buffer(reader, &Vec::new(), exact)
     }
 
     pub fn from_buffer_with_spacer<R: BufRead>(
         reader: R,
-        spacer: &Spacer,
+        spacers: &Vec<Spacer>,
         exact: bool,
     ) -> Result<Self> {
-        Self::parse_buffer(reader, Some(spacer), exact)
+        Self::parse_buffer(reader, spacers, exact)
     }
 
     /// Parses a buffer and returns a Barcodes object
     /// If a spacer is given, it is appended to each barcode
     pub fn parse_buffer<R: BufRead>(
         reader: R,
-        spacer: Option<&Spacer>,
+        spacers: &Vec<Spacer>,
         exact: bool,
     ) -> Result<Self> {
         let mut map = HashMap::new();
         let mut index = HashMap::new();
         let mut sizes = HashSet::new();
 
-        for (idx, line) in reader.lines().enumerate() {
-            let barcode = line.map(|l| Self::read_sequence(&l, spacer))?;
-            //println!("Line number: {}, length: {}, Barcode: {:?}", idx + 1, barcode.len(), barcode);
+        let first_spacer = spacers.first();
 
-            sizes.insert(barcode.len());
-            map.entry(barcode.clone()).or_insert(idx);
-            index.entry(idx).or_insert(barcode);
+        for (idx, line) in reader.lines().enumerate() {
+            let line = line?; 
+            if spacers.len() == 0 {
+                let barcode = Self::read_sequence(&line, None);
+                //println!("Line number: {}, length: {}, Barcode: {:?}", idx + 1, barcode.len(), barcode);
+
+                sizes.insert(barcode.len());
+                map.entry(barcode.clone()).or_insert(idx);
+                index.entry(idx).or_insert(barcode);
+            } else {
+                for spacer in spacers {
+                    let barcode = Self::read_sequence(&line, Some(spacer));
+                    //println!("Line number: {}, length: {}, Barcode: {:?}", idx + 1, barcode.len(), barcode);
+
+                    sizes.insert(barcode.len());
+                    map.entry(barcode.clone()).or_insert(idx);
+                    index.entry(idx).or_insert(barcode);
+                }
+            }
         }
 
         if !exact {
@@ -75,12 +89,8 @@ impl Barcodes {
             anyhow::bail!("Barcodes have different lengths");
         };
 
-        let spacer_len = if let Some(spacer) = spacer {
-            Some(spacer.seq().len())
-        } else {
-            None
-        };
-
+        let spacer_len = first_spacer.map(|s| s.seq().len());
+        
         Ok(Self {
             map,
             index,
@@ -168,11 +178,18 @@ pub struct Spacer {
     seq: Vec<u8>,
 }
 impl Spacer {
-    pub fn from_str(seq: &str) -> Self {
+    pub fn from_str(seq: &str) -> Vec<Self> {
+        seq.split(',')
+            .map(|s| Self::new(s))
+            .collect()
+    }
+
+    pub fn new(seq: &str) -> Self {
         Self {
             seq: seq.as_bytes().to_vec(),
         }
     }
+
     pub fn seq(&self) -> &[u8] {
         &self.seq
     }

@@ -46,8 +46,8 @@ impl Config {
     pub fn from_yaml(yaml: ConfigYaml, exact: bool, linkers: bool) -> Result<Self> {
         let mut barcodes = Vec::new();
         for (idx, barcode_path) in yaml.barcodes.iter().enumerate() {
-            let spacer = yaml.spacers.get(idx).map(|s| Spacer::from_str(s));
-            let barcode = Self::load_barcode(barcode_path, spacer.as_ref(), exact)?;
+            let spacers = yaml.spacers.get(idx).map(|s| Spacer::from_str(s)).unwrap_or_else(Vec::new);
+            let barcode = Self::load_barcode(barcode_path, &spacers, exact)?;
             barcodes.push(barcode);
         }
 
@@ -80,9 +80,9 @@ impl Config {
         self.barcodes.get(pos).map(|bc| bc.len()).unwrap_or(0)
     }
    
-    fn load_barcode(path: &str, spacer: Option<&Spacer>, exact: bool) -> Result<Barcodes> {
-        if let Some(spacer) = spacer {
-            Barcodes::from_file_with_spacer(path, spacer, exact)
+    fn load_barcode(path: &str, spacers: &Vec<Spacer>, exact: bool) -> Result<Barcodes> {
+        if spacers.len() > 0 {
+            Barcodes::from_file_with_spacer(path, spacers, exact)
         } else {
             Barcodes::from_file(path, exact)
         }
