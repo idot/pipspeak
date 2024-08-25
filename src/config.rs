@@ -202,14 +202,14 @@ mod testing {
         assert_eq!(config.barcodes[3].get_barcode(95, false).unwrap(), b"AAACTACA");
         assert_eq!(config.barcodes[3].get_barcode(96, false), None);
     }
-/*
+
     #[test]
     fn barcode_sequences_exact() {
         let config = Config::from_file(TEST_PATH, true, false).unwrap();
 
-        assert_eq!(config.bc1.get_barcode(0, true).unwrap(), b"AGAAACCAATG");
-        assert_eq!(config.bc1.get_barcode(95, true).unwrap(), b"TCTTTGACATG");
-        assert_eq!(config.bc1.get_barcode(96, true), None);
+        assert_eq!(config.barcodes[0].get_barcode(0, true).unwrap(), b"AGAAACCAATG");
+        assert_eq!(config.barcodes[0].get_barcode(95, true).unwrap(), b"TCTTTGACATG");
+        assert_eq!(config.barcodes[0].get_barcode(96, true), None);
 
         assert_eq!(config.barcodes[1].get_barcode(0, true).unwrap(), b"TCTGTGGAG");
         assert_eq!(config.barcodes[1].get_barcode(95, true).unwrap(), b"GTAATCGAG");
@@ -227,7 +227,7 @@ mod testing {
     #[test]
     fn construct_building_a() {
         let config = Config::from_file(TEST_PATH, false, false).unwrap();
-        let bc = config.build_barcode(0, 0, 0, 0);
+        let bc = config.build_barcode(&vec![0, 0, 0, 0]); 
         let exp = [
             "AGAAACCA".as_bytes(),
             "TCTGTG".as_bytes(),
@@ -241,7 +241,7 @@ mod testing {
     #[test]
     fn construct_building_b() {
         let config = Config::from_file(TEST_PATH, false, false).unwrap();
-        let bc = config.build_barcode(0, 95, 0, 95);
+        let bc = config.build_barcode(&vec![0, 95, 0, 95]); 
         let exp = [
             "AGAAACCA".as_bytes(),
             "GTAATC".as_bytes(),
@@ -255,7 +255,7 @@ mod testing {
     #[test]
     fn construct_building_a_exact() {
         let config = Config::from_file(TEST_PATH, true, false).unwrap();
-        let bc = config.build_barcode(0, 0, 0, 0);
+        let bc = config.build_barcode(&vec![0, 0, 0, 0]); 
         let exp = [
             "AGAAACCA".as_bytes(),
             "TCTGTG".as_bytes(),
@@ -269,7 +269,7 @@ mod testing {
     #[test]
     fn construct_building_b_exact() {
         let config = Config::from_file(TEST_PATH, true, false).unwrap();
-        let bc = config.build_barcode(0, 95, 0, 95);
+        let bc = config.build_barcode(&vec![0, 95, 0, 95]); 
         let exp = [
             "AGAAACCA".as_bytes(),
             "GTAATC".as_bytes(),
@@ -279,6 +279,6 @@ mod testing {
         .concat();
         assert_eq!(bc, exp);
     }
-  */
+  
 
 }
