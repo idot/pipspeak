@@ -27,7 +27,7 @@ pub struct Statistics {
     pub umi_base_composition: UMIBaseComposition,
 }
 impl Statistics {
-    pub fn new() -> Self {
+    pub fn new(barcode_count: usize) -> Self {
         Self {
             counter_maps: BarcodePartCounterMaps::new(barcode_count),
             barcode_umi_counter: BarcodeUmiCounter::new(),
@@ -67,14 +67,6 @@ impl Statistics {
     }
 }
 
-
-pub struct BarcodePartCounterMaps {
-    maps: Vec<Mutex<HashMap<usize, usize>>>,
-}
-
-impl BarcodePartCounterMaps {
-
-}
 
 #[derive(Debug, Serialize)]
 pub struct Timing {
@@ -236,17 +228,23 @@ impl BarcodeUmiCounter {
         }
     }
 
-    pub fn barcodes2u32(
-        b1_idx: usize,
-        b2_idx: usize,
-        b3_idx: usize,
-        b4_idx: usize,) -> u32 {
-        
-        let b1 = b1_idx as u8;
-        let b2 = b2_idx as u8;
-        let b3 = b3_idx as u8;
-        let b4 = b4_idx as u8;
-
+    pub fn barcodes2u32(indices: &Vec<usize>) -> u32 {
+        // Ensure the vector has at least one element
+        assert!(!indices.is_empty(), "The input vector must have at least one element");
+    
+        // Pad the vector with zeros if its length is less than 4
+        let mut padded_indices = indices.clone();
+        while padded_indices.len() < 4 {
+            padded_indices.push(0);
+        }
+    
+        // Convert the first four elements to u8
+        let b1 = padded_indices[0] as u8;
+        let b2 = padded_indices[1] as u8;
+        let b3 = padded_indices[2] as u8;
+        let b4 = padded_indices[3] as u8;
+    
+        // Combine the elements into a single u32 value
         ((b1 as u32) << 24) | ((b2 as u32) << 16) | ((b3 as u32) << 8) | (b4 as u32)
     }
 
@@ -259,7 +257,9 @@ impl BarcodeUmiCounter {
         let mut writer = File::create(filename).map(BufWriter::new)?;
         writer.write(b"barcode,total_umi,unique_umi,mean_umi,median_umi,q25,q75\n")?;
         for (barcode, umi_counter) in self.map.lock().unwrap().iter() {
-            let barcode_str = barcode.iter().map(|&idx| idx.to_string()).collect::<Vec<_>>().join("_");
+            //let barcode_str = barcode.iter().map(|&idx| idx.to_string()).collect::<Vec<_>>().join("_");
+            let barcode_nr = Self::barcodes2u32(barcode);
+            let umi_counts: Vec<u32> = umi_counter.map.lock().unwrap().values().cloned().collect();
             let total_umis = umi_counts.iter().sum::<u32>();
             let unique_umis = umi_counts.len() as u32;
 
@@ -271,7 +271,7 @@ impl BarcodeUmiCounter {
             let q25 = sorted_counts[(sorted_counts.len() / 4) as usize];
             let q75 = sorted_counts[(sorted_counts.len() * 3 / 4) as usize];
     
-            writeln!(writer, "{},{},{},{},{:.1},{},{}", barcode, total_umis, unique_umis,  mean_umi, median_umi, q25, q75)?;
+            writeln!(writer, "{},{},{},{},{:.1},{},{}", barcode_nr, total_umis, unique_umis,  mean_umi, median_umi, q25, q75)?;
     
         }
         Ok(())
