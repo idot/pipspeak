@@ -103,6 +103,10 @@ fn parse_records(
             statistics.barcode_umi_counter.add(&barcode_indices, &umi);
             statistics.umi_base_composition.add(&umi);
             construct_seq.extend_from_slice(&umi);
+            println!("{:?}", construct_seq);
+            println!("{:?}", rec1.seq());
+            println!("{:?}", rec1.qual());
+            println!("{:?} {}", pos, construct_seq.len());
             let construct_qual = rec1.qual().unwrap()[pos - construct_seq.len()..pos].to_vec();
             (construct_seq, construct_qual, rec1, rec2)
         });
