@@ -13,7 +13,7 @@ use gzp::{
     deflate::Gzip,
     par::compress::{ParCompress, ParCompressBuilder},
 };
-use indexmap::map::MutableEntryKey;
+
 use indicatif::ProgressBar;
 use log::{FileIO, Log, Parameters, Statistics, Timing};
 use std::{
@@ -22,8 +22,7 @@ use std::{
     time::{Duration, Instant},
 };
 use psutil::process::Process;
-use std::rc::Rc;
-use std::cell::RefCell;
+
 
 
 /// Writes a record to a gzip fastq file
@@ -38,12 +37,12 @@ fn write_to_fastq<W: Write>(writer: &mut W, id: &[u8], seq: &[u8], qual: &[u8]) 
     Ok(())
 }
 
-fn match_records<'a>(rec1: &'a Record, rec2: &'a Record, offset: usize, config: &Config,  statistics: &mut Statistics) -> Option<(&'a Record, &'a Record, usize, Vec<usize> )> {
+fn match_records(rec1: &Record, rec2: &Record, offset: usize, config: &Config, statistics: &mut Statistics) -> Option<(usize, Vec<usize>)> {
     let mut pos = 0;
     let mut barcode_indices = Vec::new();
     
     for i in 0..config.barcode_count() {
-        if let Some((new_pos, bc_idx)) = config.match_subsequence(&rec1.seq(), i, pos, if i == 0 { Some(offset) } else { None }) {
+        if let Some((new_pos, bc_idx)) = config.match_subsequence(rec1.seq(), i, pos, if i == 0 { Some(offset) } else { None }) {
             pos = new_pos;
             barcode_indices.push(bc_idx);
         } else {
@@ -53,12 +52,10 @@ fn match_records<'a>(rec1: &'a Record, rec2: &'a Record, offset: usize, config: 
     }
     
     statistics.passing_reads += 1;
-    Some((rec1, rec2, pos, barcode_indices))
+    Some((pos, barcode_indices))
 }
 
-
-
-fn match_umi<'a>(rec1: &'a Record, rec2: &'a Record, pos: usize, barcode_indices: Vec<usize>, umi_len: usize, statistics: &mut Statistics) -> Option<(&'a Record, &'a Record, usize, Vec<usize>, Vec<u8>)> {
+fn match_umi(rec1: &Record, pos: usize, barcode_indices: Vec<usize>, umi_len: usize, statistics: &mut Statistics) -> Option<(usize, Vec<usize>, Vec<u8>)> {
     if rec1.seq().len() < pos + umi_len {
         statistics.num_filtered_umi += 1;
         None
@@ -69,12 +66,12 @@ fn match_umi<'a>(rec1: &'a Record, rec2: &'a Record, pos: usize, barcode_indices
             statistics.num_filtered_umi += 1;
             None
         } else {
-            Some((rec1, rec2, pos + umi_len, barcode_indices, umi))
+            Some((pos + umi_len, barcode_indices, umi))
         }
     }
 }
 
-fn construct_match<'a>(rec1: &'a Record, rec2: &'a Record, pos: usize, barcode_indices: &[usize], umi: &Vec<u8>, config: &Config, statistics: &mut Statistics) -> (Vec<u8>, Vec<u8>, &'a Record, &'a Record) {
+fn construct_match(rec1: &Record, pos: usize, barcode_indices: &[usize], umi: &Vec<u8>, config: &Config, statistics: &mut Statistics) -> (Vec<u8>, Vec<u8>) {
     let mut construct_seq = config.build_barcode(barcode_indices);
     for (i, &idx) in barcode_indices.iter().enumerate() {
         statistics.counter_maps.add(idx, i);
@@ -84,9 +81,8 @@ fn construct_match<'a>(rec1: &'a Record, rec2: &'a Record, pos: usize, barcode_i
     construct_seq.extend_from_slice(umi);
     
     let construct_qual = rec1.qual().unwrap()[pos - construct_seq.len()..pos].to_vec();
-    (construct_seq, construct_qual, rec1, rec2)
+    (construct_seq, construct_qual)
 }
-
 
 fn parse_records(
     r1: Box<dyn FastxRead<Item = Record>>,
@@ -101,38 +97,32 @@ fn parse_records(
     pb.enable_steady_tick(Duration::from_millis(100));
     let mut statistics = Statistics::new(config.barcode_count());
 
-    let record_iter = r1
-        .zip(r2)
-        .inspect(|_| statistics.total_reads += 1)
-        .enumerate()
-        .map(|(idx, pair)| {
-            if idx % 1000000 == 0 || (idx < 1000 && idx % 100 == 0) {
-                let process = Process::current().unwrap();
-                let mem_info = process.memory_info().unwrap();
-                let used_mem = mem_info.rss();
-                let used_gb = used_mem as f64 / 1024.0 / 1024.0 / 1024.0;
-                let msg = format!("Processed {} reads, used memory: {:.2}Gb\n", idx, used_gb);
-                print!("{}", msg);
-                pb.set_message(msg);
-            }
-            pair
-        })
-        .filter_map(|(rec1, rec2)| {
-            match_records(&rec1, &rec2, offset, config, &mut statistics)
-        })
-        .filter_map(|(rec1, rec2, pos, barcode_indices)| {
-            match_umi(rec1, rec2, pos, barcode_indices, umi_len, &mut statistics)
-        })
-        .map(|(rec1, rec2, pos, barcode_indices, umi)| {
-            construct_match(rec1, rec2, pos, &barcode_indices, &umi, config, &mut statistics)
-        });
-    
+    let record_iter = r1.zip(r2).enumerate();
 
-    for (c_seq, c_qual, rec1, rec2) in record_iter {
-        statistics.whitelist.insert(c_seq.clone());
-        write_to_fastq(r1_out, rec1.id(), &c_seq, &c_qual)?;
-        write_to_fastq(r2_out, rec2.id(), rec2.seq(), rec2.qual().unwrap())?;
+    for (idx, (rec1, rec2)) in record_iter {
+        statistics.total_reads += 1;
+
+        if idx % 1000000 == 0 || (idx < 1000 && idx % 100 == 0) {
+            let process = Process::current().unwrap();
+            let mem_info = process.memory_info().unwrap();
+            let used_mem = mem_info.rss();
+            let used_gb = used_mem as f64 / 1024.0 / 1024.0 / 1024.0;
+            let msg = format!("Processed {} reads, used memory: {:.2}Gb\n", idx, used_gb);
+            print!("{}", msg);
+            pb.set_message(msg);
+        }
+
+        if let Some((pos, barcode_indices)) = match_records(&rec1, &rec2, offset, config, &mut statistics) {
+            if let Some((pos, barcode_indices, umi)) = match_umi(&rec1, pos, barcode_indices, umi_len, &mut statistics) {
+                let (c_seq, c_qual) = construct_match(&rec1, pos, &barcode_indices, &umi, config, &mut statistics);
+                
+                statistics.whitelist.insert(c_seq.clone());
+                write_to_fastq(r1_out, rec1.id(), &c_seq, &c_qual)?;
+                write_to_fastq(r2_out, rec2.id(), rec2.seq(), rec2.qual().unwrap())?;
+            }
+        }
     }
+
     statistics.calculate_metrics();
     pb.finish_with_message(format!(
         "Processed {} reads, {} passed filters ({:.4}%)",
@@ -141,6 +131,8 @@ fn parse_records(
         statistics.fraction_passing * 100.0
     ));
     Ok(statistics)
+
+
 }
 
 /// Sets the number of threads to use for writing R1 and R2 files
