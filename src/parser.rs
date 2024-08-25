@@ -1,6 +1,5 @@
 use std::{
-    io::Write,
-    time::Duration,
+    default, io::Write, time::Duration
 };
 use anyhow::Result;
 use psutil::process::Process;
@@ -10,6 +9,7 @@ use gzp::{
     deflate::Gzip,
     par::compress::{ParCompress},
 };
+use serde::de;
 
 use crate::log::Statistics;
 use crate::config::Config;
@@ -17,9 +17,10 @@ use crate::config::Config;
 fn match_records(rec1: &Record, offset: usize, config: &Config, statistics: &mut Statistics) -> Option<(usize, Vec<usize>)> {
     let mut pos = 0;
     let mut barcode_indices = Vec::new();
-    
+    let default_offset = Some(2);
+
     for i in 0..config.barcode_count() {
-        if let Some((new_pos, bc_idx)) = config.match_subsequence(rec1.seq(), i, pos, if i == 0 { Some(offset) } else { None }) {
+        if let Some((new_pos, bc_idx)) = config.match_subsequence(rec1.seq(), i, pos, if i == 0 { Some(offset) } else { default_offset }) {
             pos = pos+new_pos;
             barcode_indices.push(bc_idx);
         } else {

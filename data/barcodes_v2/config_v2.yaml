@@ -3,5 +3,5 @@ barcodes:
   bc2: "pip-seq_v2_bc2.tsv"
   bc3: "pip-seq_v2_bc3.tsv"
 spacers:
-  s1: "ATGCATC"
-  s2: "CCTCGAG"
+  s1: "ATGCAT"
+  s2: "CTCGAG"
