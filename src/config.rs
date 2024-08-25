@@ -1,11 +1,12 @@
 use crate::barcodes::{Barcodes, Spacer};
 use anyhow::Result;
 use serde::Deserialize;
+use indexmap::IndexMap;
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigYamlRead {
-    barcodes: std::collections::HashMap<String, String>,
-    spacers: std::collections::HashMap<String, String>,
+    barcodes: IndexMap<String, String>,
+    spacers: IndexMap<String, String>,
     parameters: Option<ConfigParameters>,
 }
 
@@ -28,6 +29,8 @@ pub struct Config {
     linkers: bool,
     umi_len: usize,
 }
+
+
 impl Config {
     pub fn from_file(path: &str, exact: bool, linkers: bool) -> Result<Self> {
         let contents = std::fs::read_to_string(path)?;
@@ -42,13 +45,9 @@ impl Config {
 
     pub fn from_yaml(yaml: ConfigYaml, exact: bool, linkers: bool) -> Result<Self> {
         let mut barcodes = Vec::new();
-        for (idx, (barcode_path, spacer)) in yaml.barcodes.iter().zip(yaml.spacers.iter()).enumerate() {
-            let barcode = if idx < yaml.spacers.len() {
-                let spacer = Spacer::from_str(spacer);
-                Self::load_barcode(barcode_path, Some(&spacer), exact)?
-            } else {
-                Self::load_barcode(barcode_path, None, exact)?
-            };
+        for (idx, barcode_path) in yaml.barcodes.iter().enumerate() {
+            let spacer = yaml.spacers.get(idx).map(|s| Spacer::from_str(s));
+            let barcode = Self::load_barcode(barcode_path, spacer.as_ref(), exact)?;
             barcodes.push(barcode);
         }
 
@@ -77,6 +76,9 @@ impl Config {
         self.barcodes.len()
     }
 
+    pub fn bc_len(&self, pos: usize) -> usize {
+        self.barcodes.get(pos).map(|bc| bc.len()).unwrap_or(0)
+    }
    
     fn load_barcode(path: &str, spacer: Option<&Spacer>, exact: bool) -> Result<Barcodes> {
         if let Some(spacer) = spacer {
@@ -144,62 +146,63 @@ mod testing {
         let config = Config::from_file(TEST_PATH, true, false);
         assert!(config.is_ok());
     }
-    /*
+
     #[test]
     fn barcode_lengths() {
         let config = Config::from_file(TEST_PATH, false, false).unwrap();
-        assert_eq!(config.bc1.len(), 8 + 3);
-        assert_eq!(config.bc2.len(), 6 + 3);
-        assert_eq!(config.bc3.len(), 6 + 5);
-        assert_eq!(config.bc4.len(), 8);
+        assert_eq!(config.bc_len(0), 8 + 3);
+        assert_eq!(config.bc_len(1), 6 + 3);
+        assert_eq!(config.bc_len(2), 6 + 5);
+        assert_eq!(config.bc_len(3), 8);
     }
+
 
     #[test]
     fn barcode_lengths_exact() {
         let config = Config::from_file(TEST_PATH, true, false).unwrap();
-        assert_eq!(config.bc1.len(), 8 + 3);
-        assert_eq!(config.bc2.len(), 6 + 3);
-        assert_eq!(config.bc3.len(), 6 + 5);
-        assert_eq!(config.bc4.len(), 8);
+        assert_eq!(config.bc_len(0), 8 + 3);
+        assert_eq!(config.bc_len(1), 6 + 3);
+        assert_eq!(config.bc_len(2), 6 + 5);
+        assert_eq!(config.bc_len(3), 8);
     }
 
     #[test]
     fn barcode_sequences() {
         let config = Config::from_file(TEST_PATH, false, false).unwrap();
 
-        assert_eq!(config.bc1.get_barcode(0, true).unwrap(), b"AGAAACCAATG");
-        assert_eq!(config.bc1.get_barcode(95, true).unwrap(), b"TCTTTGACATG");
-        assert_eq!(config.bc1.get_barcode(96, true), None);
+        assert_eq!(config.barcodes[0].get_barcode(0, true).unwrap(), b"AGAAACCAATG");
+        assert_eq!(config.barcodes[0].get_barcode(95, true).unwrap(), b"TCTTTGACATG");
+        assert_eq!(config.barcodes[0].get_barcode(96, true), None);
 
-        assert_eq!(config.bc1.get_barcode(0, false).unwrap(), b"AGAAACCA");
-        assert_eq!(config.bc1.get_barcode(95, false).unwrap(), b"TCTTTGAC");
-        assert_eq!(config.bc1.get_barcode(96, false), None);
+        assert_eq!(config.barcodes[0].get_barcode(0, false).unwrap(), b"AGAAACCA");
+        assert_eq!(config.barcodes[0].get_barcode(95, false).unwrap(), b"TCTTTGAC");
+        assert_eq!(config.barcodes[0].get_barcode(96, false), None);
 
-        assert_eq!(config.bc2.get_barcode(0, true).unwrap(), b"TCTGTGGAG");
-        assert_eq!(config.bc2.get_barcode(95, true).unwrap(), b"GTAATCGAG");
-        assert_eq!(config.bc2.get_barcode(96, true), None);
+        assert_eq!(config.barcodes[1].get_barcode(0, true).unwrap(), b"TCTGTGGAG");
+        assert_eq!(config.barcodes[1].get_barcode(95, true).unwrap(), b"GTAATCGAG");
+        assert_eq!(config.barcodes[1].get_barcode(96, true), None);
 
-        assert_eq!(config.bc2.get_barcode(0, false).unwrap(), b"TCTGTG");
-        assert_eq!(config.bc2.get_barcode(95, false).unwrap(), b"GTAATC");
-        assert_eq!(config.bc2.get_barcode(96, false), None);
+        assert_eq!(config.barcodes[1].get_barcode(0, false).unwrap(), b"TCTGTG");
+        assert_eq!(config.barcodes[1].get_barcode(95, false).unwrap(), b"GTAATC");
+        assert_eq!(config.barcodes[1].get_barcode(96, false), None);
 
-        assert_eq!(config.bc3.get_barcode(0, true).unwrap(), b"AAAGTGTCGAG");
-        assert_eq!(config.bc3.get_barcode(95, true).unwrap(), b"CTGAAGTCGAG");
-        assert_eq!(config.bc3.get_barcode(96, false), None);
+        assert_eq!(config.barcodes[2].get_barcode(0, true).unwrap(), b"AAAGTGTCGAG");
+        assert_eq!(config.barcodes[2].get_barcode(95, true).unwrap(), b"CTGAAGTCGAG");
+        assert_eq!(config.barcodes[2].get_barcode(96, false), None);
 
-        assert_eq!(config.bc3.get_barcode(0, false).unwrap(), b"AAAGTG");
-        assert_eq!(config.bc3.get_barcode(95, false).unwrap(), b"CTGAAG");
-        assert_eq!(config.bc3.get_barcode(96, false), None);
+        assert_eq!(config.barcodes[2].get_barcode(0, false).unwrap(), b"AAAGTG");
+        assert_eq!(config.barcodes[2].get_barcode(95, false).unwrap(), b"CTGAAG");
+        assert_eq!(config.barcodes[2].get_barcode(96, false), None);
 
-        assert_eq!(config.bc4.get_barcode(0, true).unwrap(), b"CTGGGTAT");
-        assert_eq!(config.bc4.get_barcode(95, true).unwrap(), b"AAACTACA");
-        assert_eq!(config.bc4.get_barcode(96, true), None);
+        assert_eq!(config.barcodes[3].get_barcode(0, true).unwrap(), b"CTGGGTAT");
+        assert_eq!(config.barcodes[3].get_barcode(95, true).unwrap(), b"AAACTACA");
+        assert_eq!(config.barcodes[3].get_barcode(96, true), None);
 
-        assert_eq!(config.bc4.get_barcode(0, false).unwrap(), b"CTGGGTAT");
-        assert_eq!(config.bc4.get_barcode(95, false).unwrap(), b"AAACTACA");
-        assert_eq!(config.bc4.get_barcode(96, false), None);
+        assert_eq!(config.barcodes[3].get_barcode(0, false).unwrap(), b"CTGGGTAT");
+        assert_eq!(config.barcodes[3].get_barcode(95, false).unwrap(), b"AAACTACA");
+        assert_eq!(config.barcodes[3].get_barcode(96, false), None);
     }
-
+/*
     #[test]
     fn barcode_sequences_exact() {
         let config = Config::from_file(TEST_PATH, true, false).unwrap();
@@ -208,17 +211,17 @@ mod testing {
         assert_eq!(config.bc1.get_barcode(95, true).unwrap(), b"TCTTTGACATG");
         assert_eq!(config.bc1.get_barcode(96, true), None);
 
-        assert_eq!(config.bc2.get_barcode(0, true).unwrap(), b"TCTGTGGAG");
-        assert_eq!(config.bc2.get_barcode(95, true).unwrap(), b"GTAATCGAG");
-        assert_eq!(config.bc2.get_barcode(96, true), None);
+        assert_eq!(config.barcodes[1].get_barcode(0, true).unwrap(), b"TCTGTGGAG");
+        assert_eq!(config.barcodes[1].get_barcode(95, true).unwrap(), b"GTAATCGAG");
+        assert_eq!(config.barcodes[1].get_barcode(96, true), None);
 
-        assert_eq!(config.bc3.get_barcode(0, true).unwrap(), b"AAAGTGTCGAG");
-        assert_eq!(config.bc3.get_barcode(95, true).unwrap(), b"CTGAAGTCGAG");
-        assert_eq!(config.bc3.get_barcode(96, true), None);
+        assert_eq!(config.barcodes[2].get_barcode(0, true).unwrap(), b"AAAGTGTCGAG");
+        assert_eq!(config.barcodes[2].get_barcode(95, true).unwrap(), b"CTGAAGTCGAG");
+        assert_eq!(config.barcodes[2].get_barcode(96, true), None);
 
-        assert_eq!(config.bc4.get_barcode(0, true).unwrap(), b"CTGGGTAT");
-        assert_eq!(config.bc4.get_barcode(95, true).unwrap(), b"AAACTACA");
-        assert_eq!(config.bc4.get_barcode(96, true), None);
+        assert_eq!(config.barcodes[3].get_barcode(0, true).unwrap(), b"CTGGGTAT");
+        assert_eq!(config.barcodes[3].get_barcode(95, true).unwrap(), b"AAACTACA");
+        assert_eq!(config.barcodes[3].get_barcode(96, true), None);
     }
 
     #[test]

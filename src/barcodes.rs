@@ -159,6 +159,9 @@ impl Barcodes {
     pub fn len(&self) -> usize {
         self.len
     }
+
+
+
 }
 
 pub struct Spacer {
