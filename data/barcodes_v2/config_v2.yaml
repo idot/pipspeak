@@ -1,0 +1,7 @@
+barcodes:
+  bc1: "data/barcodes_v2/pip-seq_v2_bc1.tsv"
+  bc2: "data/barcodes_v2/pip-seq_v2_bc2.tsv"
+  bc3: "data/barcodes_v2/pip-seq_v2_bc3.tsv"
+spacers:
+  s1: "ATGCATC"
+  s2: "CCTCGAG"
