@@ -115,7 +115,7 @@ impl Config {
 
     /// Returns the barcode based on index
     pub fn get_barcode(&self, b_index: usize, position: usize) -> Option<&[u8]> {
-        self.barcodes.get(b_index).and_then(|bc| bc.get_barcode(position, self.linkers))
+        self.barcodes.get(position).and_then(|bc| bc.get_barcode(b_index, self.linkers))
     }
 
 }

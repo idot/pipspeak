@@ -123,7 +123,7 @@ spacers:
   s3: "TCGAG"
 ```
 ```
-target/debug/pipspeak  -c data/config_v3.yaml   -i data/example_v3/example_R1.fq.gz  -I data/example_v3/example_R1.fq.gz
+target/debug/pipspeak --loglevel debug -c data/config_v3.yaml   -i data/example_v3/example_R1.fq.gz  -I data/example_v3/example_R1.fq.gz
 
   Processed 250 reads, 198 passed filters (79.2000%)                                                                                                  
   parameters:

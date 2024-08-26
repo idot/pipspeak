@@ -16,7 +16,8 @@ use gzp::{
 };
 
 
-use ::log::{LevelFilter, set_max_level};
+use ::log::{LevelFilter, set_max_level, info, debug, error};
+use env_logger::Builder;
 use log::{FileIO, Log, Parameters, Timing};
 use std::{
     fs::File,
@@ -45,16 +46,24 @@ fn set_threads(num_threads: usize) -> (usize, usize) {
 fn main() -> Result<()> {
     let args = Cli::parse();
 
-    env_logger::init();
     let log_level = match args.loglevel.to_lowercase().as_str() {
         "error" => LevelFilter::Error,
         "warn" => LevelFilter::Warn,
         "info" => LevelFilter::Info,
         "debug" => LevelFilter::Debug,
         "trace" => LevelFilter::Trace,
-        _ => LevelFilter::Info, // Default to Info if the log level is not recognized
+        _ => {
+            error!("Log level '{}' not recognized, defaulting to Info", args.loglevel);
+            LevelFilter::Info
+        },
     };
-    set_max_level(log_level);
+
+    let mut builder = Builder::from_default_env();
+    builder.filter_level(log_level);
+    builder.init();
+
+    info!("Starting Pipspeak version {}", env!("CARGO_PKG_VERSION"));
+    debug!("Arguments: {:?}", args);
 
     let config = Config::from_file(&args.config, args.exact, args.linkers)?;
     let r1 = initialize_reader(&args.r1)?;

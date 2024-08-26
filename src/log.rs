@@ -9,6 +9,8 @@ use serde::Serialize;
 
 use crate::config::Config;
 
+use log::trace;
+
 #[derive(Debug, Default, Serialize, Clone)]
 pub struct Statistics {
     pub total_reads: usize,
@@ -57,6 +59,8 @@ impl Statistics {
         for (position, map) in self.counter_maps.maps.iter().enumerate() {
             let map = map.lock().unwrap();
             for (k, v) in map.iter() {
+                trace!("bc_index: {} set: {} barcode: {:?}", k, v, config.get_barcode(*k, position));
+
                 let bc = config.get_barcode(*k, position)
                     .and_then(|bc| String::from_utf8(bc.to_vec()).ok())
                     .unwrap_or_else(|| "unknown".to_string());
