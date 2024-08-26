@@ -16,7 +16,7 @@ use gzp::{
 };
 
 
-use ::log::{LevelFilter, set_max_level, info, debug, error};
+use ::log::{LevelFilter, info, debug, error};
 use env_logger::Builder;
 use log::{FileIO, Log, Parameters, Timing};
 use std::{

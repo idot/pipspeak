@@ -6,12 +6,13 @@ use std::{
 use anyhow::Result;
 use hashbrown::HashSet;
 use serde::Serialize;
+use serde::ser::{Serializer, SerializeMap};
 
 use crate::config::Config;
 
 use log::trace;
 
-#[derive(Debug, Default, Serialize, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Statistics {
     pub total_reads: usize,
     pub passing_reads: usize,
@@ -19,13 +20,9 @@ pub struct Statistics {
     pub whitelist_size: usize,
     pub num_filtered: Vec<usize>,
     pub num_filtered_umi: usize,
-    #[serde(skip)]
     pub whitelist: HashSet<Vec<u8>>,
-    #[serde(skip)]
     pub counter_maps: BarcodePartCounterMaps,
-    #[serde(skip)]
     pub barcode_umi_counter: BarcodeUmiCounter,
-    #[serde(skip)]
     pub umi_base_composition: UMIBaseComposition,
 }
 impl Statistics {
@@ -71,6 +68,29 @@ impl Statistics {
     }
 }
 
+impl Serialize for Statistics {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let num_fields = 5 + self.num_filtered.len();
+        let mut map = serializer.serialize_map(Some(num_fields))?;
+        
+        map.serialize_entry("total_reads", &self.total_reads)?;
+        map.serialize_entry("passing_reads", &self.passing_reads)?;
+        map.serialize_entry("fraction_passing", &self.fraction_passing)?;
+        map.serialize_entry("whitelist_size", &self.whitelist_size)?;
+        
+        for (i, value) in self.num_filtered.iter().enumerate() {
+            let field_name = format!("num_filtered_{}", i + 1);
+            map.serialize_entry(&field_name, value)?;
+        }
+        
+        map.serialize_entry("num_filtered_umi", &self.num_filtered_umi)?;
+        
+        map.end()
+    }
+}
 
 #[derive(Debug, Serialize)]
 pub struct Timing {
