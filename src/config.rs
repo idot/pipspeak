@@ -78,10 +78,6 @@ impl Config {
     pub fn barcode_count(&self) -> usize {
         self.barcodes.len()
     }
-
-    pub fn bc_len(&self, pos: usize) -> usize {
-        self.barcodes.get(pos).map(|bc| bc.len()).unwrap_or(0)
-    }
    
     fn load_barcode(path: &str, spacers: &Vec<Spacer>, exact: bool) -> Result<Barcodes> {
         if spacers.len() > 0 {
@@ -160,20 +156,20 @@ mod testing {
     #[test]
     fn barcode_lengths() {
         let config = Config::from_file(TEST_PATH, false, false).unwrap();
-        assert_eq!(config.bc_len(0), 8 + 3);
-        assert_eq!(config.bc_len(1), 6 + 3);
-        assert_eq!(config.bc_len(2), 6 + 5);
-        assert_eq!(config.bc_len(3), 8);
+        assert_eq!(config.barcodes[0].len(), 8 + 3);
+        assert_eq!(config.barcodes[1].len(), 6 + 3);
+        assert_eq!(config.barcodes[2].len(), 6 + 5);
+        assert_eq!(config.barcodes[3].len(), 8);
     }
 
 
     #[test]
     fn barcode_lengths_exact() {
         let config = Config::from_file(TEST_PATH, true, false).unwrap();
-        assert_eq!(config.bc_len(0), 8 + 3);
-        assert_eq!(config.bc_len(1), 6 + 3);
-        assert_eq!(config.bc_len(2), 6 + 5);
-        assert_eq!(config.bc_len(3), 8);
+        assert_eq!(config.barcodes[0].len(), 8 + 3);
+        assert_eq!(config.barcodes[1].len(), 6 + 3);
+        assert_eq!(config.barcodes[2].len(), 6 + 5);
+        assert_eq!(config.barcodes[3].len(), 8);
     }
 
     #[test]

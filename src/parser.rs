@@ -1,5 +1,5 @@
 use std::{
-    default, io::Write, time::Duration
+    io::Write, time::Duration
 };
 use anyhow::Result;
 use psutil::process::Process;
@@ -7,9 +7,8 @@ use fxread::{FastxRead, Record};
 use indicatif::ProgressBar;
 use gzp::{
     deflate::Gzip,
-    par::compress::{ParCompress},
+    par::compress::ParCompress,
 };
-use serde::de;
 
 use crate::log::Statistics;
 use crate::config::Config;
