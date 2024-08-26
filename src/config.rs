@@ -2,6 +2,8 @@ use crate::barcodes::{Barcodes, Spacer};
 use anyhow::Result;
 use serde::Deserialize;
 use indexmap::IndexMap;
+use log::info;
+
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigYamlRead {
@@ -48,6 +50,7 @@ impl Config {
         for (idx, barcode_path) in yaml.barcodes.iter().enumerate() {
             let spacers = yaml.spacers.get(idx).map(|s| Spacer::from_str(s)).unwrap_or_else(Vec::new);
             let barcode = Self::load_barcode(barcode_path, &spacers, exact)?;
+            info!("barcodes:\n{}", barcode.to_str());
             barcodes.push(barcode);
         }
 
@@ -125,11 +128,18 @@ impl Config {
 mod testing {
 
     use super::*;
+    use env_logger;
+
+    fn init() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
 
     const TEST_PATH: &str = "data/config_v3.yaml";
 
     #[test]
     fn load_yaml() {
+        init();
+        log::set_max_level(log::LevelFilter::Error);
         let config = Config::from_file(TEST_PATH, false, false);
         assert!(config.is_ok());
     }

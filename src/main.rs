@@ -16,6 +16,7 @@ use gzp::{
 };
 
 
+use ::log::{LevelFilter, set_max_level};
 use log::{FileIO, Log, Parameters, Timing};
 use std::{
     fs::File,
@@ -43,6 +44,18 @@ fn set_threads(num_threads: usize) -> (usize, usize) {
 
 fn main() -> Result<()> {
     let args = Cli::parse();
+
+    env_logger::init();
+    let log_level = match args.loglevel.to_lowercase().as_str() {
+        "error" => LevelFilter::Error,
+        "warn" => LevelFilter::Warn,
+        "info" => LevelFilter::Info,
+        "debug" => LevelFilter::Debug,
+        "trace" => LevelFilter::Trace,
+        _ => LevelFilter::Info, // Default to Info if the log level is not recognized
+    };
+    set_max_level(log_level);
+
     let config = Config::from_file(&args.config, args.exact, args.linkers)?;
     let r1 = initialize_reader(&args.r1)?;
     let r2 = initialize_reader(&args.r2)?;

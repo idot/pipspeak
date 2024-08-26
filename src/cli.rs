@@ -42,4 +42,8 @@ pub struct Cli {
     /// Do not write anything to stderr
     #[clap(short = 'q', long)]
     pub quiet: bool,
+
+    /// Log level
+    #[clap(short = 'e', long, default_value = "info")]
+    pub loglevel: String,
 }

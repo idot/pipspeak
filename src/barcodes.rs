@@ -168,9 +168,26 @@ impl Barcodes {
     /// Returns the length of each barcode
     pub fn len(&self) -> usize {
         self.len
+
     }
 
-
+    #[allow(dead_code)]
+    pub fn to_str(&self) -> String {
+        let mut s = String::new();
+        let meta_len = format!("Barcodes length: {} spacer: {}\n", self.len, self.spacer_len.unwrap_or(0));
+        let meta_map = format!("Barcode map size: {}\n", self.map.keys().len());
+        let meta_index = format!("Barcode index size: {}\n", self.index.len());
+        s.push_str(&meta_len);
+        s.push_str(&meta_map);
+        s.push_str(&meta_index);
+        let mut entries: Vec<_> = self.index.iter().collect();
+        entries.sort_by_key(|&(idx, _)| idx);
+        s.push_str("index:\n");
+        for (idx, barcode) in entries {
+            s.push_str(&format!("{}: {}\n", idx, String::from_utf8_lossy(barcode)));
+        }
+        s
+    }
 
 }
 
