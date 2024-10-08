@@ -98,6 +98,7 @@ fn main() -> Result<()> {
         &config,
         args.offset,
         umi_len,
+        args.umi_offset,
     )?;
     statistics.whitelist_to_file(&whitelist_filename)?;
     statistics.counter_maps_to_file(&countermaps_filename, &config)?;

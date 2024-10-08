@@ -32,18 +32,18 @@ fn match_records(rec1: &Record, offset: usize, config: &Config, statistics: &mut
     Some((pos, barcode_indices))
 }
 
-fn match_umi(rec1: &Record, pos: usize, umi_len: usize, statistics: &mut Statistics) -> Option<(usize, Vec<u8>)> {
-    if rec1.seq().len() < pos + umi_len {
+fn match_umi(rec1: &Record, pos: usize, umi_len: usize, umi_offset: usize, statistics: &mut Statistics) -> Option<(usize, Vec<u8>)> {
+    if rec1.seq().len() < pos + umi_len + umi_offset {
         statistics.num_filtered_umi += 1;
         None
     } else {
-        let umi = rec1.seq()[pos..pos + umi_len].to_vec();
+        let umi = rec1.seq()[pos + umi_offset .. pos + umi_offset + umi_len].to_vec();
         let contains_n = umi.iter().any(|&base| base == b'N');
         if contains_n {
             statistics.num_filtered_umi += 1;
             None
         } else {
-            Some((pos + umi_len, umi))
+            Some((pos + umi_offset + umi_len, umi))
         }
     }
 }
@@ -78,6 +78,7 @@ pub fn parse_records(
     config: &Config,
     offset: usize,
     umi_len: usize,
+    umi_offset: usize,
 ) -> Result<Statistics> {
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(Duration::from_millis(100));
@@ -95,7 +96,7 @@ pub fn parse_records(
         }
 
         if let Some((pos, barcode_indices)) = match_records(&rec1, offset, config, &mut statistics) {
-            if let Some((pos, umi)) = match_umi(&rec1, pos, umi_len, &mut statistics) {
+            if let Some((pos, umi)) = match_umi(&rec1, pos, umi_len, umi_offset, &mut statistics) {
                 let (c_seq, c_qual) = construct_match(&rec1, pos, &barcode_indices, &umi, config, &mut statistics);
                 
                 statistics.whitelist.insert(c_seq.clone());
@@ -148,8 +149,10 @@ mod testing {
         let result_record = match_records(&fastq, 5, &config, &mut statistics);
         assert_eq!(result_record, Some((41, vec![41, 95, 70, 18])));
         assert_eq!(statistics.passing_reads, 1);
-        let result_umi = match_umi(&fastq, 41, 12, &mut statistics);
+        let result_umi = match_umi(&fastq, 41, 12, 0,&mut statistics);
         assert_eq!(result_umi, Some((53, b"GTACACTTCGAG".to_vec())));
+        let result_umi_4 = match_umi(&fastq, 41, 12, 4,&mut statistics);
+        assert_eq!(result_umi_4, Some((57, b"ACTTCGAGTGTG".to_vec())));
         assert_eq!(statistics.num_filtered_umi, 0);
         let result_seq = b"TACTGAATGTAATCATCTGAGAAAGACAGTACACTTCGAG".to_vec();
         let (seq, qual) = construct_match(&fastq, 55, &result_record.unwrap().1, &result_umi.unwrap().1, &config, &mut statistics);

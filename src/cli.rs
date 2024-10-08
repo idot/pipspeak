@@ -31,6 +31,10 @@ pub struct Cli {
     #[clap(short = 'u', long, default_value = "12")]
     pub umi_len: usize,
 
+    /// Offset of the UMI from the last base of the barcode (0 = no offset)
+    #[clap(long, default_value = "0")]
+    pub umi_offset: usize,
+
     /// Use exact matching instead of one mismatch
     #[clap(short = 'x', long)]
     pub exact: bool,
