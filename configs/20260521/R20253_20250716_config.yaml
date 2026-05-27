@@ -1,0 +1,7 @@
+barcodes:
+  bc1: "/users/ido.tamir/work/pipelines/vbcf-pipseq/example_starters/R20253/bc1_custom_primer.txt"
+  bc2: "/users/ido.tamir/work/pipelines/vbcf-pipseq/example_starters/R20253/bc2.txt"
+  bc3: "/users/ido.tamir/work/pipelines/vbcf-pipseq/example_starters/R20253/bc3.txt"
+spacers:
+  s1: "AACC"
+  s2: "ACAG"

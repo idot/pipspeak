@@ -1,0 +1,177 @@
+!Assay
+seqspec_version: 0.3.0
+assay_id: custom_split_seq
+name: custom-combinatorial-barcoding
+doi: ""
+date: "21 May 2026"
+description: Custom combinatorial barcoding assay with 3 round barcodes, phase block, and UMI
+modalities:
+  - rna
+lib_struct: ""
+library_protocol: custom
+library_kit: custom
+sequence_protocol: Illumina
+sequence_kit:
+  name: custom
+  kit_id: custom
+sequence_spec:
+  - !Read
+    read_id: R1.fastq.gz
+    name: Read 1 (barcodes + UMI)
+    modality: rna
+    primer_id: read_1_primer
+    min_len: 65
+    max_len: 67
+    strand: pos
+    files: []
+  - !Read
+    read_id: R2.fastq.gz
+    name: Read 2 (cDNA)
+    modality: rna
+    primer_id: read_2_primer
+    min_len: 50
+    max_len: 150
+    strand: neg
+    files: []
+library_spec:
+  - !Region
+    region_id: rna
+    region_type: rna
+    name: RNA
+    sequence_type: joined
+    sequence: GTCANNNNNNNNNNNAACCNNNNNNNNACAGNNNNNNNNCCTATTCGAGNNNNNNNNNNNNNNX
+    min_len: 65
+    max_len: 67
+    onlist: null
+    regions:
+      - !Region
+        region_id: linker_0
+        region_type: linker
+        name: Constant linker GTCA
+        sequence_type: fixed
+        sequence: GTCA
+        min_len: 4
+        max_len: 4
+        onlist: null
+      - !Region
+        region_id: phase_block
+        region_type: linker
+        name: Phase block (AGT/GT/T)
+        sequence_type: onlist
+        sequence: NNN
+        min_len: 1
+        max_len: 3
+        onlist: !Onlist
+          file_id: phase_block_onlist.txt
+          filename: phase_block_onlist.txt
+          filetype: txt
+          filesize: 0
+          url: ""
+          urltype: local
+          md5: ""
+          location: local
+      - !Region
+        region_id: barcode1
+        region_type: barcode
+        name: Round 1 barcode
+        sequence_type: onlist
+        sequence: NNNNNNNN
+        min_len: 8
+        max_len: 8
+        onlist: !Onlist
+          file_id: bc1_onlist.txt
+          filename: bc1_onlist.txt
+          filetype: txt
+          filesize: 0
+          url: ""
+          urltype: local
+          md5: ""
+          location: local
+      - !Region
+        region_id: spacer_1
+        region_type: linker
+        name: Spacer 1 AACC
+        sequence_type: fixed
+        sequence: AACC
+        min_len: 4
+        max_len: 4
+        onlist: null
+      - !Region
+        region_id: barcode2
+        region_type: barcode
+        name: Round 2 barcode
+        sequence_type: onlist
+        sequence: NNNNNNNN
+        min_len: 8
+        max_len: 8
+        onlist: !Onlist
+          file_id: bc2_onlist.txt
+          filename: bc2_onlist.txt
+          filetype: txt
+          filesize: 0
+          url: ""
+          urltype: local
+          md5: ""
+          location: local
+      - !Region
+        region_id: spacer_2
+        region_type: linker
+        name: Spacer 2 ACAG
+        sequence_type: fixed
+        sequence: ACAG
+        min_len: 4
+        max_len: 4
+        onlist: null
+      - !Region
+        region_id: barcode3
+        region_type: barcode
+        name: Round 3 barcode
+        sequence_type: onlist
+        sequence: NNNNNNNN
+        min_len: 8
+        max_len: 8
+        onlist: !Onlist
+          file_id: bc3_onlist.txt
+          filename: bc3_onlist.txt
+          filetype: txt
+          filesize: 0
+          url: ""
+          urltype: local
+          md5: ""
+          location: local
+      - !Region
+        region_id: spacer_3
+        region_type: linker
+        name: Spacer 3 CCTA
+        sequence_type: fixed
+        sequence: CCTA
+        min_len: 4
+        max_len: 4
+        onlist: null
+      - !Region
+        region_id: linker_2
+        region_type: linker
+        name: Constant linker TTCGAG
+        sequence_type: fixed
+        sequence: TTCGAG
+        min_len: 6
+        max_len: 6
+        onlist: null
+      - !Region
+        region_id: umi
+        region_type: umi
+        name: UMI
+        sequence_type: random
+        sequence: NNNNNNNNNNNNNN
+        min_len: 14
+        max_len: 14
+        onlist: null
+      - !Region
+        region_id: cdna
+        region_type: cdna
+        name: cDNA (captured RNA)
+        sequence_type: random
+        sequence: X
+        min_len: 1
+        max_len: 98
+        onlist: null
