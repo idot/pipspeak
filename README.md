@@ -2,6 +2,15 @@
 
 a CLI tool to whitelist filter pipseq reads and convert them to a 10X-style format.
 
+
+## VBCF:
+
+this is a modified version of pipspeak with more qc output to aid in troubleshooting during the establishment
+of the protocol.
+
+The current config used is in the configs folder of this repository
+
+
 ## Overview
 
 This tool is used to filter PIPSeq reads against their respective barcode whitelists
